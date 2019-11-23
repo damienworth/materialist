@@ -18,8 +18,6 @@ if (NOT OPENGL_GLU_FOUND)
     message(FATAL_ERROR "couldn't find GLU")
 endif (NOT OPENGL_GLU_FOUND)
 
-add_subdirectory(thirdparties)
-
 add_executable(materialist
     src/main.cpp)
 
@@ -57,3 +55,12 @@ PRIVATE
     OpenGL::GLU
     GLEW
     ${GLFW_STATIC_LIBRARIES})
+
+add_subdirectory(thirdparties EXCLUDE_FROM_ALL)
+
+# if (NOT CMAKE_CROSSCOMPILING)
+
+    enable_testing()
+    add_subdirectory(tests)
+
+# endif (NOT CMAKE_CROSSCOMPILING)
