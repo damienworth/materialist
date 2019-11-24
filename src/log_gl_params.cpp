@@ -11,7 +11,7 @@ using std::array;
 namespace gl_params {
 
 void
-log()
+log() noexcept
 {
 #ifndef NDEBUG
     using spdlog::debug;

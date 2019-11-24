@@ -8,6 +8,7 @@
 #include "fmtlib_all.hpp"
 #include "spdlog_all.hpp"
 
+using fmt::format;
 using std::istream_iterator;
 
 namespace {
@@ -63,9 +64,9 @@ load_vertex_shader(std::string_view path) noexcept
 GLuint
 load_fragment_shader(std::string_view path, const glm::vec4& color) noexcept
 {
-    const auto text = fmt::format(
+    const auto text = format(
         load_shader_text(path),
-        fmt::format("{}, {}, {}, {}", color[0], color[1], color[2], color[3]));
+        format("{}, {}, {}, {}", color[0], color[1], color[2], color[3]));
 
     const auto c_text = text.c_str();
     GLuint     fs     = glCreateShader(GL_FRAGMENT_SHADER);

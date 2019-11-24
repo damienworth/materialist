@@ -2,7 +2,11 @@
 
 #include "spdlog_all.hpp"
 
+#include "fps_counter.hpp"
+
 namespace mw {
+
+using namespace std::string_literals;
 
 // the following globals are extern by design
 
@@ -12,12 +16,14 @@ int _height = 480;
 
 // window handle
 GLFWwindow* _window = nullptr;
+auto        _title  = "untitled"s;
 
 bool
 create_window(std::string_view title, int width, int height) noexcept
 {
+    _title  = title;
     _window = glfwCreateWindow(
-        _width = width, _height = height, title.data(), nullptr, nullptr);
+        _width = width, _height = height, _title.c_str(), nullptr, nullptr);
     if (!_window) {
         spdlog::error("could not open main window with GLFW3");
         glfwTerminate();
@@ -40,6 +46,10 @@ void
 main_loop(GLuint vertex_array_object, GLuint shader_programme) noexcept
 {
     while (!glfwWindowShouldClose(_window)) {
+#ifndef NDEBUG
+        fps_counter::update(_window, _title);
+#endif // NDEBUG
+
         // wipe the drawing surface clear
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, _width, _height);

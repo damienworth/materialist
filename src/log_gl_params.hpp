@@ -3,7 +3,7 @@
 
 namespace gl_params {
 
-void log();
+void log() noexcept;
 
 }
 

@@ -21,6 +21,8 @@ endif (NOT OPENGL_GLU_FOUND)
 add_executable(materialist
     src/error_callback.cpp
     src/error_callback.hpp
+    src/fps_counter.cpp
+    src/fps_counter.hpp
     src/log_gl_params.cpp
     src/log_gl_params.hpp
     src/main.cpp
