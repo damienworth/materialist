@@ -58,6 +58,7 @@ endif (UNIX AND NOT APPLE)
 
 target_link_libraries(materialist
 PRIVATE
+    fmt::fmt
     spdlog::spdlog
     glm
     GLUT::GLUT

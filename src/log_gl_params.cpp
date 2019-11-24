@@ -2,6 +2,8 @@
 
 #include <array>
 
+#include "fmtlib_all.hpp"
+
 #include "opengl_all.hpp"
 #include "spdlog_all.hpp"
 
@@ -13,6 +15,8 @@ void
 log()
 {
 #ifndef NDEBUG
+    using spdlog::debug;
+
     const auto params = array{GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
                               GL_MAX_CUBE_MAP_TEXTURE_SIZE,
                               GL_MAX_DRAW_BUFFERS,
@@ -39,35 +43,34 @@ log()
                              "GL_MAX_VIEWPORT_DIMS",
                              "GL_STEREO"};
 
-    std::string GL_context_params = "GL context params: \n";
+    size_t max_length = 0;
+    std::for_each(
+        std::begin(names), std::end(names), [&max_length](const auto& text) {
+            max_length = std::max(max_length, std::strlen(text));
+        });
+
+    debug("");
+    debug("{:>{}}", "GL context params", max_length);
+    debug("");
 
     // integers - only works if the order is 0-10 integer return types
     for (int i = 0; i < 10; i++) {
         int v = 0;
         glGetIntegerv(params[i], &v);
-        GL_context_params += names[i];
-        GL_context_params += " ";
-        GL_context_params += std::to_string(v);
-        GL_context_params += "\n";
+        debug(fmt::format("{:>{}}: {}", names[i], max_length, v));
     }
 
     // others
     int v[2];
     v[0] = v[1] = 0;
     glGetIntegerv(params[10], v);
-    GL_context_params += names[10];
-    GL_context_params += " ";
-    GL_context_params += v[0];
-    GL_context_params += " ";
-    GL_context_params += v[0];
-    GL_context_params += "\n";
+    debug(fmt::format("{:>{}}: {} {}", names[10], max_length, v[0], v[1]));
 
     unsigned char s = 0;
     glGetBooleanv(params[11], &s);
-    GL_context_params += names[11];
-    GL_context_params += " ";
-    GL_context_params += static_cast<unsigned int>(s);
-    spdlog::debug(GL_context_params);
+    debug(fmt::format(
+        "{:>{}}: {}", names[11], max_length, static_cast<unsigned int>(s)));
+    debug("");
 #endif // NDEBUG
 }
 
