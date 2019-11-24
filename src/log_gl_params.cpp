@@ -3,7 +3,6 @@
 #include <array>
 
 #include "fmtlib_all.hpp"
-
 #include "opengl_all.hpp"
 #include "spdlog_all.hpp"
 

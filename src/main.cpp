@@ -85,7 +85,9 @@ main(int, char**)
     glClearColor(0.6f, 0.6f, 0.8f, 1.f);
 
     auto shader_programme = shaders::create_programme(
-        "../glsl/vertex.glsl", "../glsl/fragment.glsl");
+        "../glsl/vertex.glsl",
+        "../glsl/fragment.glsl",
+        glm::vec4(1.f, 0.2f, 0.5f, 1.f));
     mw::main_loop(vao, shader_programme);
 
     // close GL context and any other GLFW resources

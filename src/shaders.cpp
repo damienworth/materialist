@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "fmtlib_all.hpp"
 #include "spdlog_all.hpp"
 
 using std::istream_iterator;
@@ -60,9 +61,12 @@ load_vertex_shader(std::string_view path) noexcept
 }
 
 GLuint
-load_fragment_shader(std::string_view path) noexcept
+load_fragment_shader(std::string_view path, const glm::vec4& color) noexcept
 {
-    const auto text   = load_shader_text(path);
+    const auto text = fmt::format(
+        load_shader_text(path),
+        fmt::format("{}, {}, {}, {}", color[0], color[1], color[2], color[3]));
+
     const auto c_text = text.c_str();
     GLuint     fs     = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fs, 1, &c_text, nullptr);
@@ -73,10 +77,12 @@ load_fragment_shader(std::string_view path) noexcept
 
 GLuint
 create_programme(
-    std::string_view vertex_path, std::string_view fragment_path) noexcept
+    std::string_view vertex_path,
+    std::string_view fragment_path,
+    const glm::vec4& color) noexcept
 {
     auto vs = load_vertex_shader(vertex_path);
-    auto fs = load_fragment_shader(fragment_path);
+    auto fs = load_fragment_shader(fragment_path, color);
 
     GLuint programme = glCreateProgram();
     glAttachShader(programme, fs);
