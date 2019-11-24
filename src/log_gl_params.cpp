@@ -9,37 +9,35 @@ using std::array;
 
 namespace gl_params {
 
-void log() {
+void
+log()
+{
 #ifndef NDEBUG
-    const auto params = array{
-        GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
-        GL_MAX_CUBE_MAP_TEXTURE_SIZE,
-        GL_MAX_DRAW_BUFFERS,
-        GL_MAX_FRAGMENT_UNIFORM_COMPONENTS,
-        GL_MAX_TEXTURE_IMAGE_UNITS,
-        GL_MAX_TEXTURE_SIZE,
-        GL_MAX_VARYING_FLOATS,
-        GL_MAX_VERTEX_ATTRIBS,
-        GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS,
-        GL_MAX_VERTEX_UNIFORM_COMPONENTS,
-        GL_MAX_VIEWPORT_DIMS,
-        GL_STEREO
-    };
+    const auto params = array{GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
+                              GL_MAX_CUBE_MAP_TEXTURE_SIZE,
+                              GL_MAX_DRAW_BUFFERS,
+                              GL_MAX_FRAGMENT_UNIFORM_COMPONENTS,
+                              GL_MAX_TEXTURE_IMAGE_UNITS,
+                              GL_MAX_TEXTURE_SIZE,
+                              GL_MAX_VARYING_FLOATS,
+                              GL_MAX_VERTEX_ATTRIBS,
+                              GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS,
+                              GL_MAX_VERTEX_UNIFORM_COMPONENTS,
+                              GL_MAX_VIEWPORT_DIMS,
+                              GL_STEREO};
 
-    const auto names = array{
-        "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS",
-        "GL_MAX_CUBE_MAP_TEXTURE_SIZE",
-        "GL_MAX_DRAW_BUFFERS",
-        "GL_MAX_FRAGMENT_UNIFORM_COMPONENTS",
-        "GL_MAX_TEXTURE_IMAGE_UNITS",
-        "GL_MAX_TEXTURE_SIZE",
-        "GL_MAX_VARYING_FLOATS",
-        "GL_MAX_VERTEX_ATTRIBS",
-        "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS",
-        "GL_MAX_VERTEX_UNIFORM_COMPONENTS",
-        "GL_MAX_VIEWPORT_DIMS",
-        "GL_STEREO"
-    };
+    const auto names = array{"GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS",
+                             "GL_MAX_CUBE_MAP_TEXTURE_SIZE",
+                             "GL_MAX_DRAW_BUFFERS",
+                             "GL_MAX_FRAGMENT_UNIFORM_COMPONENTS",
+                             "GL_MAX_TEXTURE_IMAGE_UNITS",
+                             "GL_MAX_TEXTURE_SIZE",
+                             "GL_MAX_VARYING_FLOATS",
+                             "GL_MAX_VERTEX_ATTRIBS",
+                             "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS",
+                             "GL_MAX_VERTEX_UNIFORM_COMPONENTS",
+                             "GL_MAX_VIEWPORT_DIMS",
+                             "GL_STEREO"};
 
     std::string GL_context_params = "GL context params: \n";
 
@@ -73,4 +71,4 @@ void log() {
 #endif // NDEBUG
 }
 
-}
+} // namespace gl_params
