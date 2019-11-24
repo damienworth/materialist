@@ -6,7 +6,9 @@
 
 namespace opengl {
 
-bool initialize() noexcept {
+bool
+initialize() noexcept
+{
     spdlog::debug("starting GLFW3 {}", glfwGetVersionString());
     glfwSetErrorCallback(glfw::error_callback);
 
@@ -24,4 +26,4 @@ bool initialize() noexcept {
     return true;
 }
 
-}
+} // namespace opengl

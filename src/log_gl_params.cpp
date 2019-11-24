@@ -10,10 +10,10 @@ using std::array;
 
 namespace gl_params {
 
-void
-log() noexcept
-{
 #ifndef NDEBUG
+void
+log()
+{
     using spdlog::debug;
 
     const auto params = array{GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
@@ -70,7 +70,12 @@ log() noexcept
     debug(fmt::format(
         "{:>{}}: {}", names[11], max_length, static_cast<unsigned int>(s)));
     debug("");
-#endif // NDEBUG
 }
+#else
+void
+log() noexcept
+{
+}
+#endif // NDEBUG
 
 } // namespace gl_params
