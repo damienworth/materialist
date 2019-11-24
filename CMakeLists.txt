@@ -19,10 +19,17 @@ if (NOT OPENGL_GLU_FOUND)
 endif (NOT OPENGL_GLU_FOUND)
 
 add_executable(materialist
-    src/spdlog_all.hpp
     src/error_callback.cpp
     src/error_callback.hpp
-    src/main.cpp)
+    src/log_gl_params.cpp
+    src/log_gl_params.hpp
+    src/main.cpp
+    src/main_window.cpp
+    src/main_window.hpp
+    src/opengl_all.hpp
+    src/shaders.cpp
+    src/shaders.hpp
+    src/spdlog_all.hpp)
 
 target_include_directories(materialist
 PRIVATE

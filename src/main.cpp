@@ -1,21 +1,16 @@
 #include <array>
 #include <cstdlib>
 
-// logging
+#include "opengl_all.hpp"
 #include "spdlog_all.hpp"
 
-// clang-format off
-// opengl libs
-#include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/freeglut.h>
-#include <GLFW/glfw3.h>
-// clang-format on
+#include "main_window.hpp"
+#include "shaders.hpp"
 
 #include <glm/glm.hpp>
 
 #include "error_callback.hpp"
+#include "log_gl_params.hpp"
 
 using namespace glm;
 using spdlog::debug;
@@ -26,12 +21,12 @@ using std::array;
 int
 main(int, char**)
 {
-    #ifndef NDEBUG
+#ifndef NDEBUG
     spdlog::set_level(spdlog::level::debug);
-    #endif // NDEBUG
+#endif // NDEBUG
 
     debug("starting GLFW3 {}", glfwGetVersionString());
-    glfwSetErrorCallback(glfw_error_callback);
+    glfwSetErrorCallback(glfw::error_callback);
 
     if (!glfwInit()) {
         error("could not start GLFW3");
@@ -44,18 +39,20 @@ main(int, char**)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    GLFWwindow* window =
-        glfwCreateWindow(640, 480, "hello triangle", nullptr, nullptr);
-    if (!window) {
-        error("could not open window with GLFW3");
-        glfwTerminate();
+    GLFWmonitor*       mon   = glfwGetPrimaryMonitor();
+    const GLFWvidmode* vmode = glfwGetVideoMode(mon);
+    if (!mw::create_window("Materialist", vmode->width, vmode->height)) {
         return EXIT_FAILURE;
     }
-    glfwMakeContextCurrent(window);
+
+    glfwSetWindowSizeCallback(mw::_window, mw::window_size_callback);
+    glfwMakeContextCurrent(mw::_window);
 
     // start GLEW extension handler
     glewExperimental = GL_TRUE;
     glewInit();
+
+    gl_params::log();
 
     // get version info
     const auto renderer = glGetString(GL_RENDERER); // get renderer string
@@ -85,46 +82,11 @@ main(int, char**)
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    const auto vertex_shader =
-        "#version 400\n"
-        "in vec3 vp;"
-        "void main() {"
-        "  gl_Position = vec4(vp, 1.0);"
-        "}";
-
-    const auto fragment_shader =
-        "#version 400\n"
-        "out vec4 frag_colour;"
-        "void main() {"
-        "  frag_colour = vec4(0.5, 0.0, 0.5, 1.0);"
-        "}";
-
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, &vertex_shader, nullptr);
-    glCompileShader(vs);
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, &fragment_shader, nullptr);
-    glCompileShader(fs);
-
-    GLuint shader_programme = glCreateProgram();
-    glAttachShader(shader_programme, fs);
-    glAttachShader(shader_programme, vs);
-    glLinkProgram(shader_programme);
-
     glClearColor(0.6f, 0.6f, 0.8f, 1.f);
 
-    while(!glfwWindowShouldClose(window)) {
-        // wipe the drawing surface clear
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(shader_programme);
-        glBindVertexArray(vao);
-        // draw points 0-3 from the currently bound VAO with current in-use shader
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        // update other events like input handling
-        glfwPollEvents();
-        // put the stuff we've been drawing onto the display
-        glfwSwapBuffers(window);
-    }
+    auto shader_programme = shaders::create_programme(
+        "../glsl/vertex.glsl", "../glsl/fragment.glsl");
+    mw::main_loop(vao, shader_programme);
 
     // close GL context and any other GLFW resources
     glfwTerminate();
