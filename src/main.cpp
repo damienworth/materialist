@@ -15,6 +15,8 @@
 
 #include <glm/glm.hpp>
 
+#include "error_callback.hpp"
+
 using namespace glm;
 using spdlog::debug;
 using spdlog::error;
@@ -29,6 +31,7 @@ main(int, char**)
     #endif // NDEBUG
 
     debug("starting GLFW3 {}", glfwGetVersionString());
+    glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
         error("could not start GLFW3");
@@ -36,9 +39,10 @@ main(int, char**)
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     GLFWwindow* window =
         glfwCreateWindow(640, 480, "hello triangle", nullptr, nullptr);
@@ -115,7 +119,7 @@ main(int, char**)
         glUseProgram(shader_programme);
         glBindVertexArray(vao);
         // draw points 0-3 from the currently bound VAO with current in-use shader
-        glDrawArrays(GL_POINTS, 0, 3);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         // update other events like input handling
         glfwPollEvents();
         // put the stuff we've been drawing onto the display

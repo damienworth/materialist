@@ -19,6 +19,9 @@ if (NOT OPENGL_GLU_FOUND)
 endif (NOT OPENGL_GLU_FOUND)
 
 add_executable(materialist
+    src/spdlog_all.hpp
+    src/error_callback.cpp
+    src/error_callback.hpp
     src/main.cpp)
 
 target_include_directories(materialist
@@ -58,9 +61,9 @@ PRIVATE
 
 add_subdirectory(thirdparties EXCLUDE_FROM_ALL)
 
-# if (NOT CMAKE_CROSSCOMPILING)
+if (NOT CMAKE_CROSSCOMPILING)
 
     enable_testing()
     add_subdirectory(tests)
 
-# endif (NOT CMAKE_CROSSCOMPILING)
+endif (NOT CMAKE_CROSSCOMPILING)
