@@ -29,6 +29,8 @@ add_executable(materialist
     src/main_window.cpp
     src/main_window.hpp
     src/opengl_all.hpp
+    src/opengl_initialize.cpp
+    src/opengl_initialize.hpp
     src/shaders.cpp
     src/shaders.hpp
     src/spdlog_all.hpp)

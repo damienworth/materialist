@@ -5,7 +5,7 @@
 
 #include "opengl_all.hpp"
 
-namespace mw {
+namespace main_window {
 
 // window size
 extern int _width;
@@ -14,12 +14,12 @@ extern int _height;
 // window handle
 extern GLFWwindow* _window;
 
-bool create_window(std::string_view, int, int) noexcept;
+bool create(std::string_view, int, int) noexcept;
 
-void window_size_callback(GLFWwindow*, int, int) noexcept;
+void resize_callback(GLFWwindow*, int, int) noexcept;
 
-void main_loop(GLuint, GLuint) noexcept;
+void loop(GLuint, GLuint) noexcept;
 
-} // namespace mw
+} // namespace main_window
 
 #endif // MAIN_WINDOW_HPP

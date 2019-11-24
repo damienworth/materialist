@@ -2,15 +2,14 @@
 #include <cstdlib>
 
 #include "opengl_all.hpp"
+#include "opengl_initialize.hpp"
 #include "spdlog_all.hpp"
 
+#include "log_gl_params.hpp"
 #include "main_window.hpp"
 #include "shaders.hpp"
 
 #include <glm/glm.hpp>
-
-#include "error_callback.hpp"
-#include "log_gl_params.hpp"
 
 using namespace glm;
 using spdlog::debug;
@@ -25,28 +24,13 @@ main(int, char**)
     spdlog::set_level(spdlog::level::debug);
 #endif // NDEBUG
 
-    debug("starting GLFW3 {}", glfwGetVersionString());
-    glfwSetErrorCallback(glfw::error_callback);
-
-    if (!glfwInit()) {
-        error("could not start GLFW3");
-        return EXIT_FAILURE;
-    }
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    opengl::initialize();
 
     GLFWmonitor*       mon   = glfwGetPrimaryMonitor();
     const GLFWvidmode* vmode = glfwGetVideoMode(mon);
-    if (!mw::create_window("Materialist", vmode->width, vmode->height)) {
+    if (!main_window::create("Materialist", vmode->width, vmode->height)) {
         return EXIT_FAILURE;
     }
-
-    glfwSetWindowSizeCallback(mw::_window, mw::window_size_callback);
-    glfwMakeContextCurrent(mw::_window);
 
     // start GLEW extension handler
     glewExperimental = GL_TRUE;
@@ -87,8 +71,8 @@ main(int, char**)
     auto shader_programme = shaders::create_programme(
         "../glsl/vertex.glsl",
         "../glsl/fragment.glsl",
-        glm::vec4(1.f, 0.2f, 0.5f, 1.f));
-    mw::main_loop(vao, shader_programme);
+        {1.f, 0.2f, 0.5f, 1.f});
+    main_window::loop(vao, shader_programme);
 
     // close GL context and any other GLFW resources
     glfwTerminate();

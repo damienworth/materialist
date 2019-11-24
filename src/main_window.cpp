@@ -4,7 +4,7 @@
 
 #include "fps_counter.hpp"
 
-namespace mw {
+namespace main_window {
 
 using namespace std::string_literals;
 
@@ -14,12 +14,12 @@ using namespace std::string_literals;
 int _width  = 640;
 int _height = 480;
 
-// window handle
+// window variables
 GLFWwindow* _window = nullptr;
 auto        _title  = "untitled"s;
 
 bool
-create_window(std::string_view title, int width, int height) noexcept
+create(std::string_view title, int width, int height) noexcept
 {
     _title  = title;
     _window = glfwCreateWindow(
@@ -30,12 +30,15 @@ create_window(std::string_view title, int width, int height) noexcept
         return false;
     }
 
+    glfwSetWindowSizeCallback(_window, resize_callback);
+    glfwMakeContextCurrent(_window);
+
     return true;
 }
 
 // a call-back function
 void
-window_size_callback(GLFWwindow*, int width, int height) noexcept
+resize_callback(GLFWwindow*, int width, int height) noexcept
 {
     _width  = width;
     _height = height;
@@ -43,7 +46,7 @@ window_size_callback(GLFWwindow*, int width, int height) noexcept
 }
 
 void
-main_loop(GLuint vertex_array_object, GLuint shader_programme) noexcept
+loop(GLuint vertex_array_object, GLuint shader_programme) noexcept
 {
     while (!glfwWindowShouldClose(_window)) {
 #ifndef NDEBUG
@@ -69,4 +72,4 @@ main_loop(GLuint vertex_array_object, GLuint shader_programme) noexcept
     }
 }
 
-} // namespace mw
+} // namespace main_window
