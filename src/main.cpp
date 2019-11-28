@@ -70,7 +70,9 @@ main(int, char**)
 
     auto shader_programme = shaders::create_programme(
         "../glsl/vertex.glsl", "../glsl/fragment.glsl", {1.f, 0.2f, 0.5f, 1.f});
-    main_window::loop(vao, shader_programme);
+    if (!shader_programme) { return EXIT_FAILURE; }
+
+    main_window::loop(vao, *shader_programme);
 
     // close GL context and any other GLFW resources
     glfwTerminate();
