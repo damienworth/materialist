@@ -74,7 +74,7 @@ load_vertex_shader(std::string_view path) noexcept
 std::optional<GLuint>
 load_fragment_shader(std::string_view path) noexcept
 {
-    const auto text = load_shader_text(path);
+    const auto text   = load_shader_text(path);
     const auto c_text = text.c_str();
     GLuint     fs     = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fs, 1, &c_text, nullptr);
@@ -92,8 +92,7 @@ load_fragment_shader(std::string_view path) noexcept
 
 std::optional<GLuint>
 create_programme(
-    std::string_view vertex_path,
-    std::string_view fragment_path) noexcept
+    std::string_view vertex_path, std::string_view fragment_path) noexcept
 {
     auto vs = load_vertex_shader(vertex_path);
     auto fs = load_fragment_shader(fragment_path);

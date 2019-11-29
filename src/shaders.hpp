@@ -11,11 +11,10 @@
 namespace shaders {
 
 std::optional<GLuint> load_vertex_shader(std::string_view) noexcept;
-std::optional<GLuint>
-load_fragment_shader(std::string_view) noexcept;
+std::optional<GLuint> load_fragment_shader(std::string_view) noexcept;
 
 std::optional<GLuint>
-create_programme(std::string_view, std::string_view) noexcept;
+    create_programme(std::string_view, std::string_view) noexcept;
 
 } // namespace shaders
 
