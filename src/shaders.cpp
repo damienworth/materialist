@@ -48,6 +48,28 @@ load_shader_text(std::string_view path) noexcept
 
     return text;
 }
+
+[[maybe_unused]] bool
+is_valid(GLuint programme)
+{
+#ifndef NDEBUG
+    glValidateProgram(programme);
+    int params = -1;
+    glGetProgramiv(programme, GL_VALIDATE_STATUS, &params);
+    spdlog::debug(
+        "program {} validate status = {}",
+        programme,
+        (params == GL_TRUE ? "OK" : "ERROR"));
+    if (GL_TRUE != params) {
+        shaders::print_programme_info_log(programme);
+        return false;
+    }
+#else  // NDEBUG
+    (void)programme;
+#endif // NDEBUG
+    return true;
+}
+
 } // namespace
 
 namespace shaders {
@@ -102,6 +124,13 @@ create_programme(
     glAttachShader(programme, *vs);
     glLinkProgram(programme);
 
+#ifndef NDEBUG
+    /*
+     * Run this one in debug only since it's expensive to call
+     * glValidateProgram every time.
+     */
+    if (!is_valid(programme)) { return {}; }
+#else  // NDEBUG
     int params = -1;
     glGetProgramiv(programme, GL_LINK_STATUS, &params);
     if (GL_TRUE != params) {
@@ -109,6 +138,7 @@ create_programme(
         print_programme_info_log(programme);
         return {};
     }
+#endif // NDEBUG
 
     return programme;
 }

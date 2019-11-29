@@ -33,24 +33,6 @@ GL_type_to_string(GLenum type)
     return "other";
 }
 
-[[maybe_unused]] bool
-is_valid(GLuint programme)
-{
-#ifndef NDEBUG
-    glValidateProgram(programme);
-    int params = -1;
-    glGetProgramiv(programme, GL_VALIDATE_STATUS, &params);
-    debug("program {} validate status = {}", programme, params);
-    if (GL_TRUE != params) {
-        print_programme_info_log(programme);
-        return false;
-    }
-#else  // NDEBUG
-    (void)programme;
-#endif // NDEBUG
-    return true;
-}
-
 } // namespace
 
 void
