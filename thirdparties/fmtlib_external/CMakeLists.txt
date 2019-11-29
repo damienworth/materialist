@@ -19,12 +19,7 @@ if(result)
     message(FATAL_ERROR "Build step for fmtlib failed: ${result}")
 endif()
 
-# prevent overriding the parent project's compiler/linker
-# settings on Windows
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# add fmtlib directly to our build. This defines
-# the gtest and gtest_main targets.
+# add fmtlib directly to our build. This defines fmt::fmt target.
 add_subdirectory(
     ${CMAKE_BINARY_DIR}/fmtlib-src
     ${CMAKE_BINARY_DIR}/fmtlib-build

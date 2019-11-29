@@ -47,29 +47,39 @@ main(int, char**)
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    const auto points =
+    constexpr auto points =
         array{0.0f, 0.5f, 0.0f, 0.5f, -0.5f, 0.0f, -0.5f, -0.5f, 0.0f};
 
-    GLuint vbo = 0;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    constexpr auto colors = array{1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f};
+
+    GLuint points_vbo = 0;
+    glGenBuffers(1, &points_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
     glBufferData(
         GL_ARRAY_BUFFER,
         points.size() * sizeof(float),
         points.data(),
         GL_STATIC_DRAW);
 
+    GLuint colors_vbo = 0;
+    glGenBuffers(1, &colors_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(), GL_STATIC_DRAW);
+
     GLuint vao = 0;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glClearColor(0.6f, 0.6f, 0.8f, 1.f);
 
     auto shader_programme = shaders::create_programme(
-        "../glsl/vertex.glsl", "../glsl/fragment.glsl", {1.f, 0.2f, 0.5f, 1.f});
+        "../glsl/vertex.glsl", "../glsl/fragment.glsl");
     if (!shader_programme) { return EXIT_FAILURE; }
 
     main_window::loop(vao, *shader_programme);
