@@ -15,8 +15,8 @@ namespace {
 
 class hello_triangle_application {
     GLFWwindow* _window = nullptr;
-    const int   _WIDTH   = 800;
-    const int   _HEIGHT  = 600;
+    const int   _WIDTH  = 800;
+    const int   _HEIGHT = 600;
     VkInstance  _instance;
 
 public:
