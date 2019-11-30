@@ -13,12 +13,17 @@ add_executable(materialist
 
 target_include_directories(materialist
 PRIVATE
-    src
-    ${GLFW_INCLUDE_DIRS})
+    src)
 
 target_compile_features(materialist
 PRIVATE
     cxx_std_17)
+
+target_compile_definitions(materialist
+PRIVATE
+    GLFW_INCLUDE_VULKAN
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    GLM_FORCE_RADIANS)
 
 if (UNIX AND NOT APPLE)
     target_compile_options(materialist
