@@ -55,7 +55,13 @@ bool is_device_suitable(VkPhysicalDevice, VkSurfaceKHR) noexcept;
 VkPhysicalDevice pick_physical_device(VkInstance, VkSurfaceKHR) noexcept;
 
 std::tuple<VkDevice, VkQueue, VkQueue> create_logical_device(
-    VkPhysicalDevice, VkSurfaceKHR, const std::vector<const char*>&) noexcept;
+    VkPhysicalDevice,
+    VkSurfaceKHR
+#ifndef NDEBUG
+    ,
+    const std::vector<const char*>&
+#endif // NDEBUG
+    ) noexcept;
 
 VkSurfaceKHR create_surface(VkInstance, GLFWwindow*) noexcept;
 
@@ -69,8 +75,9 @@ struct queue_family_indices {
 queue_family_indices find_queue_families(VkPhysicalDevice, VkSurfaceKHR);
 
 std::tuple<VkInstance, VkDevice, VkQueue, VkQueue, VkSurfaceKHR> init_vulkan(
-    GLFWwindow*,
+    GLFWwindow*
 #ifndef NDEBUG
+    ,
     VkDebugUtilsMessengerEXT&,
     const std::vector<const char*>&
 #endif // NDEBUG
@@ -107,8 +114,9 @@ hello_triangle::run() noexcept
     _window = init_window("Vulkan", _WIDTH, _HEIGHT);
     std::tie(_instance, _device, _graphics_queue, _present_queue, _surface) =
         std::move(init_vulkan(
-            _window,
+            _window
 #ifndef NDEBUG
+            ,
             _debug_messenger,
             _validation_layers
 #endif // NDEBUG
@@ -347,9 +355,13 @@ pick_physical_device(VkInstance instance, VkSurfaceKHR surface) noexcept
 
 std::tuple<VkDevice, VkQueue, VkQueue>
 create_logical_device(
-    VkPhysicalDevice                physical_device,
-    VkSurfaceKHR                    surface,
-    const std::vector<const char*>& validation_layers) noexcept
+    VkPhysicalDevice physical_device,
+    VkSurfaceKHR     surface
+#ifndef NDEBUG
+    ,
+    const std::vector<const char*>& validation_layers
+#endif // NDEBUG
+    ) noexcept
 {
     queue_family_indices indices =
         find_queue_families(physical_device, surface);
@@ -458,8 +470,9 @@ find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface)
 
 std::tuple<VkInstance, VkDevice, VkQueue, VkQueue, VkSurfaceKHR>
 init_vulkan(
-    GLFWwindow* window,
+    GLFWwindow* window
 #ifndef NDEBUG
+    ,
     VkDebugUtilsMessengerEXT&       debug_messenger,
     const std::vector<const char*>& validation_layers
 #endif // NDEBUG
@@ -477,8 +490,14 @@ init_vulkan(
 
     VkSurfaceKHR surface         = create_surface(instance, window);
     auto         physical_device = pick_physical_device(instance, surface);
-    auto [device, graphics_queue, present_queue] =
-        create_logical_device(physical_device, surface, validation_layers);
+    auto [device, graphics_queue, present_queue] = create_logical_device(
+        physical_device,
+        surface
+#ifndef NDEBUG
+        ,
+        validation_layers
+#endif // NDEBUG
+    );
 
     return std::tuple{std::move(instance),
                       std::move(device),
