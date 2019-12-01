@@ -7,6 +7,8 @@ find_package(glm 0.9.9 REQUIRED)
 find_package(Vulkan REQUIRED)
 
 add_executable(materialist
+    src/application_hello_triangle.cpp
+    src/application_hello_triangle.hpp
     src/fmtlib_all.hpp
     src/main.cpp
     src/spdlog_all.hpp)
