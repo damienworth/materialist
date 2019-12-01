@@ -571,18 +571,18 @@ VKAPI_ATTR VkBool32 VKAPI_CALL
 {
     switch (severity) {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-        debug("validation layer: {}", callback_data->pMessage);
+        debug(callback_data->pMessage);
         break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-        info("validation layer {}", callback_data->pMessage);
+        info(callback_data->pMessage);
         break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-        warn("validation layer {}", callback_data->pMessage);
+        warn(callback_data->pMessage);
         break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-        error("validation layer {}", callback_data->pMessage);
+        error(callback_data->pMessage);
         break;
-    default: critical("validation layer {}", callback_data->pMessage); break;
+    default: critical(callback_data->pMessage); break;
     }
 
     return VK_FALSE;
