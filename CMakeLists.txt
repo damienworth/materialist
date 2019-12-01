@@ -2,49 +2,30 @@ cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
 project(materialist VERSION 0.1.0 LANGUAGES CXX)
 
-find_package(PkgConfig REQUIRED)
-pkg_search_module(GLFW REQUIRED glfw3)
-
-find_package(GLEW REQUIRED)
+find_package(glfw3 REQUIRED)
 find_package(glm 0.9.9 REQUIRED)
-find_package(GLUT REQUIRED)
-find_package(OpenGL REQUIRED)
-
-if (NOT OPENGL_FOUND)
-    message(FATAL_ERROR "couldn't find opengl")
-endif (NOT OPENGL_FOUND)
-
-if (NOT OPENGL_GLU_FOUND)
-    message(FATAL_ERROR "couldn't find GLU")
-endif (NOT OPENGL_GLU_FOUND)
+find_package(Vulkan REQUIRED)
 
 add_executable(materialist
-    src/error_callback.cpp
-    src/error_callback.hpp
-    src/fps_counter.cpp
-    src/fps_counter.hpp
-    src/log_gl_params.cpp
-    src/log_gl_params.hpp
+    src/application_hello_triangle.cpp
+    src/application_hello_triangle.hpp
+    src/fmtlib_all.hpp
     src/main.cpp
-    src/main_window.cpp
-    src/main_window.hpp
-    src/opengl_all.hpp
-    src/opengl_initialize.cpp
-    src/opengl_initialize.hpp
-    src/print_info_log.cpp
-    src/print_info_log.hpp
-    src/shaders.cpp
-    src/shaders.hpp
     src/spdlog_all.hpp)
 
 target_include_directories(materialist
 PRIVATE
-    src
-    ${GLFW_INCLUDE_DIRS})
+    src)
 
 target_compile_features(materialist
 PRIVATE
     cxx_std_17)
+
+target_compile_definitions(materialist
+PRIVATE
+    GLFW_INCLUDE_VULKAN
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    GLM_FORCE_RADIANS)
 
 if (UNIX AND NOT APPLE)
     target_compile_options(materialist
@@ -67,11 +48,8 @@ PRIVATE
     fmt::fmt
     spdlog::spdlog
     glm
-    GLUT::GLUT
-    OpenGL::GL
-    OpenGL::GLU
-    GLEW
-    ${GLFW_STATIC_LIBRARIES})
+    glfw
+    Vulkan::Vulkan)
 
 add_subdirectory(thirdparties EXCLUDE_FROM_ALL)
 
