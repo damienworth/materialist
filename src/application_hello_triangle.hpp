@@ -14,10 +14,15 @@ class hello_triangle {
     const int   _WIDTH  = 800;
     const int   _HEIGHT = 600;
     VkInstance  _instance;
+    VkDevice    _device;
+    VkQueue     _graphics_queue;
+    VkQueue     _present_queue;
 
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT _debug_messenger;
 #endif // NDEBUG
+
+    VkSurfaceKHR _surface;
 
 #ifndef NDEBUG
     const std::vector<const char*> _validation_layers = {
