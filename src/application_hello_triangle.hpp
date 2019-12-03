@@ -1,22 +1,25 @@
 #ifndef APPLICATION_HELLO_TRIANGLE_HPP
 #define APPLICATION_HELLO_TRIANGLE_HPP
 
-#ifndef NDEBUG
 #include <vector>
-#endif // NDEBUG
 
 #include <GLFW/glfw3.h>
 
 namespace application {
 
 class hello_triangle {
-    GLFWwindow* _window = nullptr;
-    const int   _WIDTH  = 800;
-    const int   _HEIGHT = 600;
-    VkInstance  _instance;
-    VkDevice    _device;
-    VkQueue     _graphics_queue;
-    VkQueue     _present_queue;
+    GLFWwindow*              _window = nullptr;
+    const int                _WIDTH  = 800;
+    const int                _HEIGHT = 600;
+    VkInstance               _instance;
+    VkDevice                 _device;
+    VkQueue                  _graphics_queue;
+    VkQueue                  _present_queue;
+    VkSwapchainKHR           _swapchain;
+    std::vector<VkImage>     _swapchain_images;
+    VkFormat                 _swapchain_image_format;
+    VkExtent2D               _swapchain_extent;
+    std::vector<VkImageView> _swapchain_image_views;
 
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT _debug_messenger;
