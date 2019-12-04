@@ -3,7 +3,8 @@
 
 #ifdef __linux__
 #pragma GCC diagnostic ignored "-Wshadow"
-#include <fmt/format.h>
 #endif // __linux__
+
+#include <fmt/format.h>
 
 #endif // FMTLIB_ALL_HPP
