@@ -26,19 +26,16 @@ add_executable(materialist
     src/spdlog_all.hpp)
 
 set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
-set(SHADERS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 if (UNIX AND NOT APPLE)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/compile_shaders.sh.in ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.sh @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/compile_shaders.sh.in ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.sh @ONLY)
 
-add_custom_command(
-TARGET materialist
-PRE_BUILD
-WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-VERBATIM USES_TERMINAL
-COMMENT "compiling shaders"
-BYPRODUCTS vert.spv frag.spv
-COMMAND ${BASH} ./compile_shaders.sh)
+    add_custom_target(compile_shaders ALL
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM USES_TERMINAL
+    COMMENT "compiling shaders"
+    COMMAND ${BASH} ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.sh)
 endif (UNIX AND NOT APPLE)
 
 target_include_directories(materialist
