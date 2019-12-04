@@ -1,0 +1,3 @@
+#!/bin/bash -e
+@GLSLC@ @SHADERS_DIR@/shader.vert -o @SHADERS_BINARY_DIR@/vert.spv
+@GLSLC@ @SHADERS_DIR@/shader.frag -o @SHADERS_BINARY_DIR@/frag.spv

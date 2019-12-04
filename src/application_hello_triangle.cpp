@@ -112,6 +112,8 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
 std::vector<VkImageView>
 create_image_views(VkDevice, const std::vector<VkImage>&, VkFormat) noexcept;
 
+void create_graphics_pipeline() noexcept;
+
 std::tuple<
     VkInstance,
     VkDevice,
@@ -784,6 +786,11 @@ create_image_views(
     return swapchain_image_views;
 }
 
+void
+create_graphics_pipeline() noexcept
+{
+}
+
 std::tuple<
     VkInstance,
     VkDevice,
@@ -844,6 +851,8 @@ init_vulkan(
 
     auto swapchain_image_views =
         create_image_views(device, swapchain_images, swapchain_image_format);
+
+    /*auto graphics_pipeline = */ create_graphics_pipeline();
 
     return std::tuple{std::move(instance),
                       std::move(device),
