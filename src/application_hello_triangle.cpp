@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <iterator>
 #include <optional>
 #include <set>
@@ -112,7 +113,12 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
 std::vector<VkImageView>
 create_image_views(VkDevice, const std::vector<VkImage>&, VkFormat) noexcept;
 
-void create_graphics_pipeline() noexcept;
+void create_graphics_pipeline(VkDevice) noexcept;
+
+std::vector<char> read_file(std::string_view filename) noexcept;
+
+VkShaderModule
+create_shader_module(VkDevice, const std::vector<char>&) noexcept;
 
 std::tuple<
     VkInstance,
@@ -787,8 +793,73 @@ create_image_views(
 }
 
 void
-create_graphics_pipeline() noexcept
+create_graphics_pipeline(VkDevice device) noexcept
 {
+    auto vert_shader_code = read_file("shaders/shader.vert.spv");
+    auto frag_shader_code = read_file("shaders/shader.frag.spv");
+
+    VkShaderModule vert_shader_module =
+        create_shader_module(device, vert_shader_code);
+    VkShaderModule frag_shader_module =
+        create_shader_module(device, frag_shader_code);
+
+    VkPipelineShaderStageCreateInfo vert_shader_stage_info = {};
+    vert_shader_stage_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vert_shader_stage_info.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+    vert_shader_stage_info.module = vert_shader_module;
+    vert_shader_stage_info.pName  = "main";
+
+    VkPipelineShaderStageCreateInfo frag_shader_stage_info = {};
+    frag_shader_stage_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    frag_shader_stage_info.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+    frag_shader_stage_info.module = frag_shader_module;
+    frag_shader_stage_info.pName  = "main";
+
+    vkDestroyShaderModule(device, frag_shader_module, nullptr);
+    vkDestroyShaderModule(device, vert_shader_module, nullptr);
+
+    VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info,
+                                                       frag_shader_stage_info};
+
+    (void)shader_stages;
+}
+
+std::vector<char>
+read_file(std::string_view filename) noexcept
+{
+    std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
+    if (!file) {
+        error("failed to open file {}", filename);
+        std::terminate();
+    }
+
+    const auto        file_size = file.tellg();
+    std::vector<char> buffer(file_size);
+    file.seekg(0);
+    file.read(buffer.data(), file_size);
+    file.close();
+
+    return buffer;
+}
+
+VkShaderModule
+create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
+{
+    VkShaderModuleCreateInfo create_info = {};
+    create_info.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = code.size();
+    create_info.pCode    = reinterpret_cast<const uint32_t*>(code.data());
+
+    VkShaderModule shader_module;
+    if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) !=
+        VK_SUCCESS) {
+        error("failed to create shader module");
+        std::terminate();
+    }
+
+    return shader_module;
 }
 
 std::tuple<
@@ -852,7 +923,7 @@ init_vulkan(
     auto swapchain_image_views =
         create_image_views(device, swapchain_images, swapchain_image_format);
 
-    /*auto graphics_pipeline = */ create_graphics_pipeline();
+    /* auto graphics_pipeline = */ create_graphics_pipeline(device);
 
     return std::tuple{std::move(instance),
                       std::move(device),
