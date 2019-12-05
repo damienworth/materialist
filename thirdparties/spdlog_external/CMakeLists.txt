@@ -1,6 +1,6 @@
 # download and unpack spdlog at configure time
 configure_file(
-    ${PROJECT_SOURCE_DIR}/cmake/spdlog.txt.in ${CMAKE_BINARY_DIR}/spdlog-download/CMakeLists.txt)
+    ${PROJECT_SOURCE_DIR}/config/spdlog.txt.in ${CMAKE_BINARY_DIR}/spdlog-download/CMakeLists.txt)
 
 execute_process(
     COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .

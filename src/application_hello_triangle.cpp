@@ -113,7 +113,9 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
 std::vector<VkImageView>
 create_image_views(VkDevice, const std::vector<VkImage>&, VkFormat) noexcept;
 
-void create_graphics_pipeline(VkDevice) noexcept;
+void create_render_pass() noexcept;
+
+VkPipelineLayout create_graphics_pipeline(VkDevice, VkExtent2D) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
 
@@ -130,7 +132,8 @@ std::tuple<
     std::vector<VkImage>,
     VkFormat,
     VkExtent2D,
-    std::vector<VkImageView>>
+    std::vector<VkImageView>,
+    VkPipelineLayout>
 init_vulkan(
     GLFWwindow*,
     const std::vector<const char*>&,
@@ -151,6 +154,7 @@ void cleanup(
     VkSurfaceKHR,
     VkSwapchainKHR,
     std::vector<VkImageView>&,
+    VkPipelineLayout,
     GLFWwindow*
 #ifndef NDEBUG
     ,
@@ -184,7 +188,8 @@ hello_triangle::run() noexcept
         _swapchain_images,
         _swapchain_image_format,
         _swapchain_extent,
-        _swapchain_image_views) =
+        _swapchain_image_views,
+        _pipeline_layout) =
         std::move(init_vulkan(
             _window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
@@ -203,6 +208,7 @@ hello_triangle::run() noexcept
         _surface,
         _swapchain,
         _swapchain_image_views,
+        _pipeline_layout,
         _window
 #ifndef NDEBUG
         ,
@@ -794,7 +800,12 @@ create_image_views(
 }
 
 void
-create_graphics_pipeline(VkDevice device) noexcept
+create_render_pass() noexcept
+{
+}
+
+VkPipelineLayout
+create_graphics_pipeline(VkDevice device, VkExtent2D swapchain_extent) noexcept
 {
     auto vert_shader_code = read_file("shaders/shader.vert.spv");
     auto frag_shader_code = read_file("shaders/shader.frag.spv");
@@ -823,8 +834,117 @@ create_graphics_pipeline(VkDevice device) noexcept
 
     VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info,
                                                        frag_shader_stage_info};
-
     (void)shader_stages;
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+    vertex_input_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertex_input_info.vertexBindingDescriptionCount   = 0;
+    vertex_input_info.vertexAttributeDescriptionCount = 0;
+    (void)vertex_input_info;
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly = {};
+    input_assembly.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    input_assembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    input_assembly.primitiveRestartEnable = VK_FALSE;
+    (void)input_assembly;
+
+    VkViewport viewport = {};
+    viewport.x          = 0.f;
+    viewport.y          = 0.f;
+    viewport.width      = static_cast<float>(swapchain_extent.width);
+    viewport.height     = static_cast<float>(swapchain_extent.height);
+    viewport.minDepth   = 0.f;
+    viewport.maxDepth   = 1.f;
+
+    VkRect2D scissor = {};
+    scissor.offset   = {0, 0};
+    scissor.extent   = swapchain_extent;
+
+    VkPipelineViewportStateCreateInfo viewport_state = {};
+    viewport_state.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewport_state.viewportCount = 1;
+    viewport_state.pViewports    = &viewport;
+    viewport_state.scissorCount  = 1;
+    viewport_state.pScissors     = &scissor;
+    (void)viewport_state;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = {};
+    rasterizer.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable        = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth               = 1.f;
+    rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.depthBiasEnable         = VK_FALSE;
+    (void)rasterizer;
+
+    VkPipelineMultisampleStateCreateInfo multisampling = {};
+    multisampling.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable   = VK_FALSE;
+    multisampling.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading      = 1.f;
+    multisampling.pSampleMask           = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable      = VK_FALSE;
+    (void)multisampling;
+
+    VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+    color_blend_attachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    color_blend_attachment.blendEnable         = VK_FALSE;
+    color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    color_blend_attachment.colorBlendOp        = VK_BLEND_OP_ADD;
+    color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    color_blend_attachment.alphaBlendOp        = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo color_blending = {};
+    color_blending.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    color_blending.logicOpEnable     = VK_FALSE;
+    color_blending.logicOp           = VK_LOGIC_OP_COPY;
+    color_blending.attachmentCount   = 1;
+    color_blending.pAttachments      = &color_blend_attachment;
+    color_blending.blendConstants[0] = 0.f;
+    color_blending.blendConstants[1] = 0.f;
+    color_blending.blendConstants[2] = 0.f;
+    color_blending.blendConstants[3] = 0.f;
+    (void)color_blending;
+
+    VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT,
+                                       VK_DYNAMIC_STATE_LINE_WIDTH};
+
+    VkPipelineDynamicStateCreateInfo dynamic_state = {};
+    dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic_state.dynamicStateCount = 2;
+    dynamic_state.pDynamicStates    = dynamic_states;
+    (void)dynamic_state;
+
+    VkPipelineLayout pipeline_layout;
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {};
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount         = 0;
+    pipeline_layout_info.pSetLayouts            = nullptr;
+    pipeline_layout_info.pushConstantRangeCount = 0;
+    pipeline_layout_info.pPushConstantRanges    = nullptr;
+
+    if (vkCreatePipelineLayout(
+            device, &pipeline_layout_info, nullptr, &pipeline_layout) !=
+        VK_SUCCESS) {
+        error("failed to create pipeline layout");
+        std::terminate();
+    }
+
+    return pipeline_layout;
 }
 
 std::vector<char>
@@ -873,7 +993,8 @@ std::tuple<
     std::vector<VkImage>,
     VkFormat,
     VkExtent2D,
-    std::vector<VkImageView>>
+    std::vector<VkImageView>,
+    VkPipelineLayout>
 init_vulkan(
     GLFWwindow*                     window,
     const std::vector<const char*>& device_extensions,
@@ -924,7 +1045,9 @@ init_vulkan(
     auto swapchain_image_views =
         create_image_views(device, swapchain_images, swapchain_image_format);
 
-    /* auto graphics_pipeline = */ create_graphics_pipeline(device);
+    create_render_pass();
+
+    auto pipeline_layout = create_graphics_pipeline(device, swapchain_extent);
 
     return std::tuple{std::move(instance),
                       std::move(device),
@@ -935,7 +1058,8 @@ init_vulkan(
                       std::move(swapchain_images),
                       std::move(swapchain_image_format),
                       std::move(swapchain_extent),
-                      std::move(swapchain_image_views)};
+                      std::move(swapchain_image_views),
+                      std::move(pipeline_layout)};
 }
 
 void
@@ -952,6 +1076,7 @@ cleanup(
     VkSurfaceKHR              surface,
     VkSwapchainKHR            swapchain,
     std::vector<VkImageView>& swapchain_image_views,
+    VkPipelineLayout          pipeline_layout,
     GLFWwindow*               window
 #ifndef NDEBUG
     ,
@@ -962,6 +1087,8 @@ cleanup(
 #ifndef NDEBUG
     destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
 #endif // NDEBUG
+
+    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
 
     for (auto image_view : swapchain_image_views) {
         vkDestroyImageView(device, image_view, nullptr);

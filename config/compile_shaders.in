@@ -1,0 +1,18 @@
+.PHONY = shaders makeshaders_dir
+
+GLSL_SOURCES := $(wildcard @SHADERS_DIR@/*.vert)
+GLSL_SOURCES += $(wildcard @SHADERS_DIR@/*.frag)
+SPIR_V_BINARIES := $(GLSL_SOURCES:@SHADERS_DIR@/%.vert=@SHADERS_BINARY_DIR@/%.vert.spv)
+SPIR_V_BINARIES += $(GLSL_SOURCES:@SHADERS_DIR@/%.frag=@SHADERS_BINARY_DIR@/%.frag.spv)
+GLSL_COMPILER = @GLSLC@
+
+shaders: makeshaders_dir $(SPIR_V_BINARIES)
+
+makeshaders_dir:
+	@mkdir -p @SHADERS_BINARY_DIR@
+
+@SHADERS_BINARY_DIR@/%.vert.spv: @SHADERS_DIR@/%.vert
+	$(GLSL_COMPILER) $< -o $@
+
+@SHADERS_BINARY_DIR@/%.frag.spv: @SHADERS_DIR@/%.frag
+	$(GLSL_COMPILER) $< -o $@

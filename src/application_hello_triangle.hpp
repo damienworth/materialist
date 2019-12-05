@@ -20,6 +20,7 @@ class hello_triangle {
     VkFormat                 _swapchain_image_format;
     VkExtent2D               _swapchain_extent;
     std::vector<VkImageView> _swapchain_image_views;
+    VkPipelineLayout         _pipeline_layout;
 
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT _debug_messenger;

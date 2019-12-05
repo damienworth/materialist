@@ -1,5 +1,5 @@
 # download and unpack fmtlib at configure time
-configure_file(${PROJECT_SOURCE_DIR}/cmake/fmtlib.txt.in ${CMAKE_BINARY_DIR}/fmtlib-download/CMakeLists.txt)
+configure_file(${PROJECT_SOURCE_DIR}/config/fmtlib.txt.in ${CMAKE_BINARY_DIR}/fmtlib-download/CMakeLists.txt)
 
 execute_process(
     COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .

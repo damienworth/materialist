@@ -2,21 +2,26 @@ cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
 project(materialist VERSION 0.1.0 LANGUAGES CXX)
 
+include(ProcessorCount)
+ProcessorCount(CORES_NUM)
+
+if(CORES_NUM EQUAL 0)
+    set(CORES_NUM 1)
+endif(CORES_NUM EQUAL 0)
+
+find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm 0.9.9 REQUIRED)
-find_package(Vulkan REQUIRED)
 
 find_program(GLSLC NAMES glslc)
 if (NOT GLSLC)
     message(FATAL_ERROR "glslc not found")
 endif (NOT GLSLC)
 
-if (UNIX AND NOT APPLE)
-    find_program(BASH NAMES bash)
-    if (NOT BASH)
-        message(FATAL_ERROR "bash not found")
-    endif (NOT BASH)
-endif (UNIX AND NOT APPLE)
+find_program(MAKE NAMES make)
+if (NOT MAKE)
+    message(FATAL_ERROR "make not found")
+endif (NOT MAKE)
 
 add_executable(materialist
     src/application_hello_triangle.cpp
@@ -26,17 +31,15 @@ add_executable(materialist
     src/spdlog_all.hpp)
 
 set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
-set(BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(SHADERS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 
-if (UNIX AND NOT APPLE)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/compile_shaders.sh.in ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.sh @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/compile_shaders.in ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.makefile @ONLY)
 
-    add_custom_target(compile_shaders ALL
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    VERBATIM USES_TERMINAL
-    COMMENT "compiling shaders"
-    COMMAND ${BASH} ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.sh)
-endif (UNIX AND NOT APPLE)
+add_custom_target(compile_shaders ALL
+WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+VERBATIM USES_TERMINAL
+COMMENT "compiling shaders"
+COMMAND ${MAKE} -j${CORES_NUM} -f ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.makefile)
 
 target_include_directories(materialist
 PRIVATE
