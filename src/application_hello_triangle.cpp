@@ -321,7 +321,8 @@ create_instance(
 
     const auto extensions = get_required_extensions();
 
-    create_info.enabledExtensionCount   = extensions.size();
+    create_info.enabledExtensionCount =
+        static_cast<uint32_t>(extensions.size());
     create_info.ppEnabledExtensionNames = extensions.data();
 #ifndef NDEBUG
     create_info.enabledLayerCount =
