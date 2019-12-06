@@ -118,6 +118,12 @@ VkRenderPass create_render_pass(VkDevice, VkFormat) noexcept;
 std::tuple<VkPipelineLayout, VkPipeline>
     create_graphics_pipeline(VkDevice, VkExtent2D, VkRenderPass) noexcept;
 
+std::vector<VkFramebuffer> create_framebuffers(
+    VkDevice,
+    VkRenderPass,
+    const std::vector<VkImageView>&,
+    VkExtent2D) noexcept;
+
 std::vector<char> read_file(std::string_view filename) noexcept;
 
 VkShaderModule
@@ -136,7 +142,8 @@ std::tuple<
     std::vector<VkImageView>,
     VkPipelineLayout,
     VkPipeline,
-    VkRenderPass>
+    VkRenderPass,
+    std::vector<VkFramebuffer>>
 init_vulkan(
     GLFWwindow*,
     const std::vector<const char*>&,
@@ -160,6 +167,7 @@ void cleanup(
     VkPipelineLayout,
     VkPipeline,
     VkRenderPass,
+    std::vector<VkFramebuffer>&,
     GLFWwindow*
 #ifndef NDEBUG
     ,
@@ -196,7 +204,8 @@ hello_triangle::run() noexcept
         _swapchain_image_views,
         _pipeline_layout,
         _graphics_pipeline,
-        _render_pass) =
+        _render_pass,
+        _swapchain_framebuffers) =
         std::move(init_vulkan(
             _window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
@@ -218,6 +227,7 @@ hello_triangle::run() noexcept
         _pipeline_layout,
         _graphics_pipeline,
         _render_pass,
+        _swapchain_framebuffers,
         _window
 #ifndef NDEBUG
         ,
@@ -1022,6 +1032,41 @@ create_graphics_pipeline(
     return {pipeline_layout, graphics_pipeline};
 }
 
+std::vector<VkFramebuffer>
+create_framebuffers(
+    VkDevice                        device,
+    VkRenderPass                    render_pass,
+    const std::vector<VkImageView>& swapchain_image_views,
+    VkExtent2D                      swapchain_extent) noexcept
+{
+    std::vector<VkFramebuffer> swapchain_framebuffers;
+    swapchain_framebuffers.resize(swapchain_image_views.size());
+
+    for (size_t i = 0; i != swapchain_image_views.size(); ++i) {
+        VkImageView attachments[] = {swapchain_image_views[i]};
+
+        VkFramebufferCreateInfo framebuffer_info = {};
+        framebuffer_info.sType      = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = render_pass;
+        framebuffer_info.attachmentCount = 1;
+        framebuffer_info.pAttachments    = attachments;
+        framebuffer_info.width           = swapchain_extent.width;
+        framebuffer_info.height          = swapchain_extent.height;
+        framebuffer_info.layers          = 1;
+
+        if (vkCreateFramebuffer(
+                device,
+                &framebuffer_info,
+                nullptr,
+                &swapchain_framebuffers[i]) != VK_SUCCESS) {
+            error("failed to create framebuffer");
+            std::terminate();
+        }
+    }
+
+    return swapchain_framebuffers;
+}
+
 std::vector<char>
 read_file(std::string_view filename) noexcept
 {
@@ -1071,7 +1116,8 @@ std::tuple<
     std::vector<VkImageView>,
     VkPipelineLayout,
     VkPipeline,
-    VkRenderPass>
+    VkRenderPass,
+    std::vector<VkFramebuffer>>
 init_vulkan(
     GLFWwindow*                     window,
     const std::vector<const char*>& device_extensions,
@@ -1127,6 +1173,9 @@ init_vulkan(
     auto [pipeline_layout, graphics_pipeline] =
         create_graphics_pipeline(device, swapchain_extent, render_pass);
 
+    auto swapchain_framebuffers = create_framebuffers(
+        device, render_pass, swapchain_image_views, swapchain_extent);
+
     return std::tuple{std::move(instance),
                       std::move(device),
                       std::move(graphics_queue),
@@ -1139,7 +1188,8 @@ init_vulkan(
                       std::move(swapchain_image_views),
                       std::move(pipeline_layout),
                       std::move(graphics_pipeline),
-                      std::move(render_pass)};
+                      std::move(render_pass),
+                      std::move(swapchain_framebuffers)};
 }
 
 void
@@ -1151,15 +1201,16 @@ main_loop(GLFWwindow* window) noexcept
 
 void
 cleanup(
-    VkInstance                instance,
-    VkDevice                  device,
-    VkSurfaceKHR              surface,
-    VkSwapchainKHR            swapchain,
-    std::vector<VkImageView>& swapchain_image_views,
-    VkPipelineLayout          pipeline_layout,
-    VkPipeline                graphics_pipeline,
-    VkRenderPass              render_pass,
-    GLFWwindow*               window
+    VkInstance                  instance,
+    VkDevice                    device,
+    VkSurfaceKHR                surface,
+    VkSwapchainKHR              swapchain,
+    std::vector<VkImageView>&   swapchain_image_views,
+    VkPipelineLayout            pipeline_layout,
+    VkPipeline                  graphics_pipeline,
+    VkRenderPass                render_pass,
+    std::vector<VkFramebuffer>& swapchain_framebuffers,
+    GLFWwindow*                 window
 #ifndef NDEBUG
     ,
     VkDebugUtilsMessengerEXT debug_messenger
@@ -1169,6 +1220,10 @@ cleanup(
 #ifndef NDEBUG
     destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
 #endif // NDEBUG
+
+    for (auto framebuffer : swapchain_framebuffers) {
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
 
     vkDestroyPipeline(device, graphics_pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
