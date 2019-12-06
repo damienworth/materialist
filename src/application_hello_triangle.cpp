@@ -113,9 +113,10 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
 std::vector<VkImageView>
 create_image_views(VkDevice, const std::vector<VkImage>&, VkFormat) noexcept;
 
-void create_render_pass() noexcept;
+VkRenderPass create_render_pass(VkDevice, VkFormat) noexcept;
 
-VkPipelineLayout create_graphics_pipeline(VkDevice, VkExtent2D) noexcept;
+std::tuple<VkPipelineLayout, VkPipeline>
+    create_graphics_pipeline(VkDevice, VkExtent2D, VkRenderPass) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
 
@@ -133,7 +134,9 @@ std::tuple<
     VkFormat,
     VkExtent2D,
     std::vector<VkImageView>,
-    VkPipelineLayout>
+    VkPipelineLayout,
+    VkPipeline,
+    VkRenderPass>
 init_vulkan(
     GLFWwindow*,
     const std::vector<const char*>&,
@@ -155,6 +158,8 @@ void cleanup(
     VkSwapchainKHR,
     std::vector<VkImageView>&,
     VkPipelineLayout,
+    VkPipeline,
+    VkRenderPass,
     GLFWwindow*
 #ifndef NDEBUG
     ,
@@ -189,7 +194,9 @@ hello_triangle::run() noexcept
         _swapchain_image_format,
         _swapchain_extent,
         _swapchain_image_views,
-        _pipeline_layout) =
+        _pipeline_layout,
+        _graphics_pipeline,
+        _render_pass) =
         std::move(init_vulkan(
             _window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
@@ -209,6 +216,8 @@ hello_triangle::run() noexcept
         _swapchain,
         _swapchain_image_views,
         _pipeline_layout,
+        _graphics_pipeline,
+        _render_pass,
         _window
 #ifndef NDEBUG
         ,
@@ -799,13 +808,50 @@ create_image_views(
     return swapchain_image_views;
 }
 
-void
-create_render_pass() noexcept
+VkRenderPass
+create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
 {
+    VkAttachmentDescription color_attachment = {};
+    color_attachment.format                  = swapchain_image_format;
+    color_attachment.samples                 = VK_SAMPLE_COUNT_1_BIT;
+    color_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_attachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_attachment.finalLayout             = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference color_attachment_ref = {};
+    color_attachment_ref.attachment            = 0;
+    color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments    = &color_attachment_ref;
+
+    VkRenderPassCreateInfo render_pass_info = {};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_info.attachmentCount = 1;
+    render_pass_info.pAttachments    = &color_attachment;
+    render_pass_info.subpassCount    = 1;
+    render_pass_info.pSubpasses      = &subpass;
+
+    VkRenderPass render_pass;
+    if (vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass) !=
+        VK_SUCCESS) {
+        error("failed to create render pass");
+        std::terminate();
+    }
+
+    return render_pass;
 }
 
-VkPipelineLayout
-create_graphics_pipeline(VkDevice device, VkExtent2D swapchain_extent) noexcept
+std::tuple<VkPipelineLayout, VkPipeline>
+create_graphics_pipeline(
+    VkDevice     device,
+    VkExtent2D   swapchain_extent,
+    VkRenderPass render_pass) noexcept
 {
     auto vert_shader_code = read_file("shaders/shader.vert.spv");
     auto frag_shader_code = read_file("shaders/shader.frag.spv");
@@ -828,13 +874,6 @@ create_graphics_pipeline(VkDevice device, VkExtent2D swapchain_extent) noexcept
     frag_shader_stage_info.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
     frag_shader_stage_info.module = frag_shader_module;
     frag_shader_stage_info.pName  = "main";
-
-    vkDestroyShaderModule(device, frag_shader_module, nullptr);
-    vkDestroyShaderModule(device, vert_shader_module, nullptr);
-
-    VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info,
-                                                       frag_shader_stage_info};
-    (void)shader_stages;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
     vertex_input_info.sType =
@@ -944,7 +983,43 @@ create_graphics_pipeline(VkDevice device, VkExtent2D swapchain_extent) noexcept
         std::terminate();
     }
 
-    return pipeline_layout;
+    VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info,
+                                                       frag_shader_stage_info};
+
+    VkGraphicsPipelineCreateInfo pipeline_info = {};
+    pipeline_info.sType      = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline_info.stageCount = 2;
+    pipeline_info.pStages    = shader_stages;
+    pipeline_info.pVertexInputState   = &vertex_input_info;
+    pipeline_info.pInputAssemblyState = &input_assembly;
+    pipeline_info.pViewportState      = &viewport_state;
+    pipeline_info.pRasterizationState = &rasterizer;
+    pipeline_info.pMultisampleState   = &multisampling;
+    pipeline_info.pDepthStencilState  = nullptr;
+    pipeline_info.pColorBlendState    = &color_blending;
+    pipeline_info.pDynamicState       = nullptr;
+    pipeline_info.layout              = pipeline_layout;
+    pipeline_info.renderPass          = render_pass;
+    pipeline_info.subpass             = 0;
+    pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
+    pipeline_info.basePipelineIndex   = -1;
+
+    VkPipeline graphics_pipeline;
+    if (vkCreateGraphicsPipelines(
+            device,
+            VK_NULL_HANDLE,
+            1,
+            &pipeline_info,
+            nullptr,
+            &graphics_pipeline) != VK_SUCCESS) {
+        error("failed to create graphics pipeline");
+        std::terminate();
+    }
+
+    vkDestroyShaderModule(device, frag_shader_module, nullptr);
+    vkDestroyShaderModule(device, vert_shader_module, nullptr);
+
+    return {pipeline_layout, graphics_pipeline};
 }
 
 std::vector<char>
@@ -994,7 +1069,9 @@ std::tuple<
     VkFormat,
     VkExtent2D,
     std::vector<VkImageView>,
-    VkPipelineLayout>
+    VkPipelineLayout,
+    VkPipeline,
+    VkRenderPass>
 init_vulkan(
     GLFWwindow*                     window,
     const std::vector<const char*>& device_extensions,
@@ -1045,9 +1122,10 @@ init_vulkan(
     auto swapchain_image_views =
         create_image_views(device, swapchain_images, swapchain_image_format);
 
-    create_render_pass();
+    auto render_pass = create_render_pass(device, swapchain_image_format);
 
-    auto pipeline_layout = create_graphics_pipeline(device, swapchain_extent);
+    auto [pipeline_layout, graphics_pipeline] =
+        create_graphics_pipeline(device, swapchain_extent, render_pass);
 
     return std::tuple{std::move(instance),
                       std::move(device),
@@ -1059,7 +1137,9 @@ init_vulkan(
                       std::move(swapchain_image_format),
                       std::move(swapchain_extent),
                       std::move(swapchain_image_views),
-                      std::move(pipeline_layout)};
+                      std::move(pipeline_layout),
+                      std::move(graphics_pipeline),
+                      std::move(render_pass)};
 }
 
 void
@@ -1077,6 +1157,8 @@ cleanup(
     VkSwapchainKHR            swapchain,
     std::vector<VkImageView>& swapchain_image_views,
     VkPipelineLayout          pipeline_layout,
+    VkPipeline                graphics_pipeline,
+    VkRenderPass              render_pass,
     GLFWwindow*               window
 #ifndef NDEBUG
     ,
@@ -1088,7 +1170,9 @@ cleanup(
     destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
 #endif // NDEBUG
 
+    vkDestroyPipeline(device, graphics_pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+    vkDestroyRenderPass(device, render_pass, nullptr);
 
     for (auto image_view : swapchain_image_views) {
         vkDestroyImageView(device, image_view, nullptr);
