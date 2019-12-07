@@ -22,6 +22,8 @@ namespace application {
 
 namespace /* anonymous */ {
 
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 #ifndef NDEBUG
 void populate_debug_messenger_create_info(
     VkDebugUtilsMessengerCreateInfoEXT&) noexcept;
@@ -124,6 +126,24 @@ std::vector<VkFramebuffer> create_framebuffers(
     const std::vector<VkImageView>&,
     VkExtent2D) noexcept;
 
+VkCommandPool
+    create_command_pool(VkDevice, VkPhysicalDevice, VkSurfaceKHR) noexcept;
+
+std::vector<VkCommandBuffer> create_command_buffers(
+    VkDevice,
+    const std::vector<VkFramebuffer>&,
+    VkRenderPass,
+    VkExtent2D,
+    VkPipeline,
+    VkCommandPool) noexcept;
+
+std::tuple<
+    std::vector<VkSemaphore>,
+    std::vector<VkSemaphore>,
+    std::vector<VkFence>,
+    std::vector<VkFence>>
+create_sync_objects(VkDevice, const std::vector<VkImage>&) noexcept;
+
 std::vector<char> read_file(std::string_view filename) noexcept;
 
 VkShaderModule
@@ -143,7 +163,13 @@ std::tuple<
     VkPipelineLayout,
     VkPipeline,
     VkRenderPass,
-    std::vector<VkFramebuffer>>
+    std::vector<VkFramebuffer>,
+    VkCommandPool,
+    std::vector<VkCommandBuffer>,
+    std::vector<VkSemaphore>,
+    std::vector<VkSemaphore>,
+    std::vector<VkFence>,
+    std::vector<VkFence>>
 init_vulkan(
     GLFWwindow*,
     const std::vector<const char*>&,
@@ -156,7 +182,30 @@ init_vulkan(
 #endif // NDEBUG
     ) noexcept;
 
-void main_loop(GLFWwindow*) noexcept;
+void main_loop(
+    VkDevice,
+    VkQueue,
+    VkQueue,
+    VkSwapchainKHR,
+    const std::vector<VkCommandBuffer>&,
+    const std::vector<VkSemaphore>&,
+    const std::vector<VkSemaphore>&,
+    const std::vector<VkFence>&,
+    std::vector<VkFence>&,
+    size_t&,
+    GLFWwindow*) noexcept;
+
+void draw_frame(
+    VkDevice,
+    VkQueue,
+    VkQueue,
+    VkSwapchainKHR,
+    const std::vector<VkCommandBuffer>&,
+    const std::vector<VkSemaphore>&,
+    const std::vector<VkSemaphore>&,
+    const std::vector<VkFence>&,
+    std::vector<VkFence>&,
+    size_t&) noexcept;
 
 void cleanup(
     VkInstance,
@@ -168,6 +217,10 @@ void cleanup(
     VkPipeline,
     VkRenderPass,
     std::vector<VkFramebuffer>&,
+    VkCommandPool,
+    std::vector<VkSemaphore>&,
+    std::vector<VkSemaphore>&,
+    std::vector<VkFence>&,
     GLFWwindow*
 #ifndef NDEBUG
     ,
@@ -205,7 +258,13 @@ hello_triangle::run() noexcept
         _pipeline_layout,
         _graphics_pipeline,
         _render_pass,
-        _swapchain_framebuffers) =
+        _swapchain_framebuffers,
+        _command_pool,
+        _command_buffers,
+        _image_available_semaphores,
+        _render_finished_semaphores,
+        _inflight_fences,
+        _images_inflight) =
         std::move(init_vulkan(
             _window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
@@ -217,7 +276,18 @@ hello_triangle::run() noexcept
             _validation_layers
 #endif // NDEBUG
             ));
-    main_loop(_window);
+    main_loop(
+        _device,
+        _graphics_queue,
+        _present_queue,
+        _swapchain,
+        _command_buffers,
+        _image_available_semaphores,
+        _render_finished_semaphores,
+        _inflight_fences,
+        _images_inflight,
+        _current_frame,
+        _window);
     cleanup(
         _instance,
         _device,
@@ -228,6 +298,10 @@ hello_triangle::run() noexcept
         _graphics_pipeline,
         _render_pass,
         _swapchain_framebuffers,
+        _command_pool,
+        _image_available_semaphores,
+        _render_finished_semaphores,
+        _inflight_fences,
         _window
 #ifndef NDEBUG
         ,
@@ -840,12 +914,23 @@ create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments    = &color_attachment_ref;
 
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass          = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass          = 0;
+    dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
     VkRenderPassCreateInfo render_pass_info = {};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_info.attachmentCount = 1;
     render_pass_info.pAttachments    = &color_attachment;
     render_pass_info.subpassCount    = 1;
     render_pass_info.pSubpasses      = &subpass;
+    render_pass_info.dependencyCount = 1;
+    render_pass_info.pDependencies   = &dependency;
 
     VkRenderPass render_pass;
     if (vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass) !=
@@ -1067,6 +1152,140 @@ create_framebuffers(
     return swapchain_framebuffers;
 }
 
+VkCommandPool
+create_command_pool(
+    VkDevice         device,
+    VkPhysicalDevice physical_device,
+    VkSurfaceKHR     surface) noexcept
+{
+    auto indices = find_queue_families(physical_device, surface);
+
+    VkCommandPoolCreateInfo pool_info = {};
+    pool_info.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.queueFamilyIndex = *indices.graphics_family;
+    pool_info.flags            = 0;
+
+    VkCommandPool command_pool;
+    if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) !=
+        VK_SUCCESS) {
+        error("failed to create command pool");
+        std::terminate();
+    }
+
+    return command_pool;
+}
+
+std::vector<VkCommandBuffer>
+create_command_buffers(
+    VkDevice                          device,
+    const std::vector<VkFramebuffer>& swapchain_framebuffers,
+    VkRenderPass                      render_pass,
+    VkExtent2D                        swapchain_extent,
+    VkPipeline                        graphics_pipeline,
+    VkCommandPool                     command_pool) noexcept
+{
+    std::vector<VkCommandBuffer> command_buffers;
+    command_buffers.resize(swapchain_framebuffers.size());
+
+    VkCommandBufferAllocateInfo alloc_info = {};
+    alloc_info.sType       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_pool;
+    alloc_info.level       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount =
+        static_cast<uint32_t>(command_buffers.size());
+
+    if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data()) !=
+        VK_SUCCESS) {
+        error("failed to allocate command buffers");
+        std::terminate();
+    }
+
+    for (size_t i = 0; i != command_buffers.size(); ++i) {
+        VkCommandBufferBeginInfo begin_info = {};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        begin_info.flags = 0;
+        begin_info.pInheritanceInfo = nullptr;
+
+        if (vkBeginCommandBuffer(command_buffers[i], &begin_info) !=
+            VK_SUCCESS) {
+            error("failed to begin recording command buffer");
+            std::terminate();
+        }
+
+        VkRenderPassBeginInfo render_pass_info = {};
+        render_pass_info.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        render_pass_info.renderPass  = render_pass;
+        render_pass_info.framebuffer = swapchain_framebuffers[i];
+        render_pass_info.renderArea.offset = {0, 0};
+        render_pass_info.renderArea.extent = swapchain_extent;
+
+        VkClearValue clear_color         = {0.f, 0.f, 0.f, 1.f};
+        render_pass_info.clearValueCount = 1;
+        render_pass_info.pClearValues    = &clear_color;
+
+        vkCmdBeginRenderPass(
+            command_buffers[i], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(
+            command_buffers[i],
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphics_pipeline);
+        vkCmdDraw(command_buffers[i], 3, 1, 0, 0);
+        vkCmdEndRenderPass(command_buffers[i]);
+
+        if (vkEndCommandBuffer(command_buffers[i]) != VK_SUCCESS) {
+            error("failed to record command buffer");
+            std::terminate();
+        }
+    }
+
+    return command_buffers;
+}
+
+std::tuple<
+    std::vector<VkSemaphore>,
+    std::vector<VkSemaphore>,
+    std::vector<VkFence>,
+    std::vector<VkFence>>
+create_sync_objects(
+    VkDevice device, const std::vector<VkImage>& swapchain_images) noexcept
+{
+    VkSemaphoreCreateInfo semaphore_info = {};
+    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fence_info = {};
+    fence_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    std::vector<VkSemaphore> image_available_semaphores(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkSemaphore> render_finished_semaphores(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkFence>     inflight_fences(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkFence>     images_inflight(
+        swapchain_images.size(), VK_NULL_HANDLE);
+
+    for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
+        if (vkCreateSemaphore(
+                device,
+                &semaphore_info,
+                nullptr,
+                &image_available_semaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(
+                device,
+                &semaphore_info,
+                nullptr,
+                &render_finished_semaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(device, &fence_info, nullptr, &inflight_fences[i]) !=
+                VK_SUCCESS) {
+            error("failed to create synchronization objects for a frame");
+            std::terminate();
+        }
+    }
+
+    return {std::move(image_available_semaphores),
+            std::move(render_finished_semaphores),
+            std::move(inflight_fences),
+            std::move(images_inflight)};
+}
+
 std::vector<char>
 read_file(std::string_view filename) noexcept
 {
@@ -1117,7 +1336,13 @@ std::tuple<
     VkPipelineLayout,
     VkPipeline,
     VkRenderPass,
-    std::vector<VkFramebuffer>>
+    std::vector<VkFramebuffer>,
+    VkCommandPool,
+    std::vector<VkCommandBuffer>,
+    std::vector<VkSemaphore>,
+    std::vector<VkSemaphore>,
+    std::vector<VkFence>,
+    std::vector<VkFence>>
 init_vulkan(
     GLFWwindow*                     window,
     const std::vector<const char*>& device_extensions,
@@ -1176,6 +1401,22 @@ init_vulkan(
     auto swapchain_framebuffers = create_framebuffers(
         device, render_pass, swapchain_image_views, swapchain_extent);
 
+    auto command_pool = create_command_pool(device, physical_device, surface);
+
+    auto command_buffers = create_command_buffers(
+        device,
+        swapchain_framebuffers,
+        render_pass,
+        swapchain_extent,
+        graphics_pipeline,
+        command_pool);
+
+    auto
+        [image_available_semaphores,
+         render_finished_semaphores,
+         inflight_fences,
+         images_inflight] = create_sync_objects(device, swapchain_images);
+
     return std::tuple{std::move(instance),
                       std::move(device),
                       std::move(graphics_queue),
@@ -1189,14 +1430,124 @@ init_vulkan(
                       std::move(pipeline_layout),
                       std::move(graphics_pipeline),
                       std::move(render_pass),
-                      std::move(swapchain_framebuffers)};
+                      std::move(swapchain_framebuffers),
+                      std::move(command_pool),
+                      std::move(command_buffers),
+                      std::move(image_available_semaphores),
+                      std::move(render_finished_semaphores),
+                      std::move(inflight_fences),
+                      std::move(images_inflight)};
 }
 
 void
-main_loop(GLFWwindow* window) noexcept
+main_loop(
+    VkDevice                            device,
+    VkQueue                             graphics_queue,
+    VkQueue                             present_queue,
+    VkSwapchainKHR                      swapchain,
+    const std::vector<VkCommandBuffer>& command_buffers,
+    const std::vector<VkSemaphore>&     image_available_semaphores,
+    const std::vector<VkSemaphore>&     render_finished_semaphores,
+    const std::vector<VkFence>&         inflight_fences,
+    std::vector<VkFence>&               images_inflight,
+    size_t&                             current_frame,
+    GLFWwindow*                         window) noexcept
 {
     assert(window);
-    while (!glfwWindowShouldClose(window)) { glfwPollEvents(); }
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        draw_frame(
+            device,
+            graphics_queue,
+            present_queue,
+            swapchain,
+            command_buffers,
+            image_available_semaphores,
+            render_finished_semaphores,
+            inflight_fences,
+            images_inflight,
+            current_frame);
+    }
+
+    vkDeviceWaitIdle(device);
+}
+
+void
+draw_frame(
+    VkDevice                            device,
+    VkQueue                             graphics_queue,
+    VkQueue                             present_queue,
+    VkSwapchainKHR                      swapchain,
+    const std::vector<VkCommandBuffer>& command_buffers,
+    const std::vector<VkSemaphore>&     image_available_semaphores,
+    const std::vector<VkSemaphore>&     render_finished_semaphores,
+    const std::vector<VkFence>&         inflight_fences,
+    std::vector<VkFence>&               images_inflight,
+    size_t&                             current_frame) noexcept
+{
+    vkWaitForFences(
+        device, 1, &inflight_fences[current_frame], VK_TRUE, UINT64_MAX);
+
+    uint32_t image_index;
+    vkAcquireNextImageKHR(
+        device,
+        swapchain,
+        UINT64_MAX,
+        image_available_semaphores[current_frame],
+        VK_NULL_HANDLE,
+        &image_index);
+
+    // check if a previous frame is using this image (i.e. there is its fence to
+    // wait on)
+    if (images_inflight[image_index] != VK_NULL_HANDLE) {
+        vkWaitForFences(
+            device, 1, &images_inflight[image_index], VK_TRUE, UINT64_MAX);
+    }
+    // mark the image as now being in use by this frame
+    images_inflight[image_index] = inflight_fences[current_frame];
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore wait_semaphores[] = {image_available_semaphores[current_frame]};
+    VkPipelineStageFlags wait_stages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores    = wait_semaphores;
+    submit_info.pWaitDstStageMask  = wait_stages;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers    = &command_buffers[image_index];
+
+    VkSemaphore signal_semaphores[] = {
+        render_finished_semaphores[current_frame]};
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores    = signal_semaphores;
+
+    vkResetFences(device, 1, &inflight_fences[current_frame]);
+
+    if (vkQueueSubmit(
+            graphics_queue, 1, &submit_info, inflight_fences[current_frame]) !=
+        VK_SUCCESS) {
+        error("failed to submit draw command buffer");
+        std::terminate();
+    }
+
+    VkPresentInfoKHR present_info   = {};
+    present_info.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores    = signal_semaphores;
+
+    VkSwapchainKHR swapchains[] = {swapchain};
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains    = swapchains;
+    present_info.pImageIndices  = &image_index;
+    present_info.pResults       = nullptr;
+
+    vkQueuePresentKHR(present_queue, &present_info);
+
+    vkQueueWaitIdle(present_queue);
+
+    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void
@@ -1210,6 +1561,10 @@ cleanup(
     VkPipeline                  graphics_pipeline,
     VkRenderPass                render_pass,
     std::vector<VkFramebuffer>& swapchain_framebuffers,
+    VkCommandPool               command_pool,
+    std::vector<VkSemaphore>&   image_available_semaphores,
+    std::vector<VkSemaphore>&   render_finished_semaphores,
+    std::vector<VkFence>&       inflight_fences,
     GLFWwindow*                 window
 #ifndef NDEBUG
     ,
@@ -1220,6 +1575,21 @@ cleanup(
 #ifndef NDEBUG
     destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
 #endif // NDEBUG
+
+    // std::for_each(
+    //     begin(images_inflight),
+    //     end(images_inflight),
+    //     [&device](auto& image_inflight) {
+    //         vkDestroyFence(device, image_inflight, nullptr);
+    //     });
+
+    for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
+        vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
+        vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
+        vkDestroyFence(device, inflight_fences[i], nullptr);
+    }
+
+    vkDestroyCommandPool(device, command_pool, nullptr);
 
     for (auto framebuffer : swapchain_framebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
