@@ -1,6 +1,7 @@
 #include "application_hello_triangle.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <iterator>

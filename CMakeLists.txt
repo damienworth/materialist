@@ -10,8 +10,6 @@ if(CORES_NUM EQUAL 0)
 endif(CORES_NUM EQUAL 0)
 
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(glm 0.9.9 REQUIRED)
 
 find_program(GLSLC NAMES glslc)
 if (NOT GLSLC)
@@ -23,6 +21,8 @@ if (NOT MAKE)
     message(FATAL_ERROR "make not found")
 endif (NOT MAKE)
 
+add_subdirectory(extern)
+
 add_executable(materialist
     src/application_hello_triangle.cpp
     src/application_hello_triangle.hpp
@@ -32,7 +32,6 @@ add_executable(materialist
 
 set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADERS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
-
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/compile_shaders.in ${CMAKE_CURRENT_BINARY_DIR}/compile_shaders.makefile @ONLY)
 
 add_custom_target(compile_shaders ALL
@@ -74,12 +73,10 @@ endif (UNIX AND NOT APPLE)
 target_link_libraries(materialist
 PRIVATE
     fmt::fmt
-    spdlog::spdlog
-    glm
+    spdlog::spdlog_header_only
+    glm_static
     glfw
     Vulkan::Vulkan)
-
-add_subdirectory(thirdparties EXCLUDE_FROM_ALL)
 
 if (NOT CMAKE_CROSSCOMPILING)
 

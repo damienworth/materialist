@@ -13,6 +13,7 @@
 #pragma GCC diagnostic ignored "-Wunreachable-code"
 #endif // __linux__
 
+#include <cassert>
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/spdlog.h"
 

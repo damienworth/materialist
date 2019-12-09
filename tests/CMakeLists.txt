@@ -1,5 +1,7 @@
 include(GoogleTest)
 
+add_subdirectory(extern)
+
 add_executable(materialist_tests
     src/materialist_tests.cpp)
 
