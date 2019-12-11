@@ -14,3 +14,6 @@
 	path = extern/glm
 	url = https://github.com/g-truc/glm.git
 
+[submodule "extern/gsl"]
+	path = extern/gsl
+	url = https://github.com/microsoft/GSL.git
