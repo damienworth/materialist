@@ -5,13 +5,15 @@
 
 #include <GLFW/glfw3.h>
 
+#include <vulkan/vulkan.hpp>
+
 namespace application {
 
 class hello_triangle {
     GLFWwindow*                  _window = nullptr;
     const int                    _WIDTH  = 800;
     const int                    _HEIGHT = 600;
-    VkInstance                   _instance;
+    vk::UniqueInstance           _instance;
     VkDevice                     _device;
     VkQueue                      _graphics_queue;
     VkQueue                      _present_queue;

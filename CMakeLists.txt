@@ -52,7 +52,8 @@ target_compile_definitions(materialist
 PRIVATE
     GLFW_INCLUDE_VULKAN
     GLM_FORCE_DEPTH_ZERO_TO_ONE
-    GLM_FORCE_RADIANS)
+    GLM_FORCE_RADIANS
+    VULKAN_HPP_NO_EXCEPTIONS=1)
 
 if (UNIX AND NOT APPLE)
     target_compile_options(materialist

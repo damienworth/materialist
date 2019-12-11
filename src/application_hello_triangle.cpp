@@ -10,6 +10,8 @@
 #include <string_view>
 #include <tuple>
 
+#include <gsl/gsl_util>
+
 #include "spdlog_all.hpp"
 
 using spdlog::critical;
@@ -43,7 +45,7 @@ void destroy_debug_utils_messenger_EXT(
 bool check_validation_layer_support(const std::vector<const char*>&) noexcept;
 #endif // NDEBUG
 
-VkInstance create_instance(
+vk::UniqueInstance create_instance(
 #ifndef NDEBUG
     const std::vector<const char*>&
 #endif // NDEBUG
@@ -151,7 +153,7 @@ VkShaderModule
 create_shader_module(VkDevice, const std::vector<char>&) noexcept;
 
 std::tuple<
-    VkInstance,
+    vk::UniqueInstance,
     VkDevice,
     VkQueue,
     VkQueue,
@@ -209,7 +211,7 @@ void draw_frame(
     size_t&) noexcept;
 
 void cleanup(
-    VkInstance,
+    vk::UniqueInstance&,
     VkDevice,
     VkSurfaceKHR,
     VkSwapchainKHR,
@@ -391,7 +393,7 @@ check_validation_layer_support(
 }
 #endif // NDEBUG
 
-VkInstance
+vk::UniqueInstance
 create_instance(
 #ifndef NDEBUG
     const std::vector<const char*>& validation_layers
@@ -405,39 +407,30 @@ create_instance(
     }
 #endif // NDEBUG
 
-    VkInstance instance;
-
-    VkApplicationInfo app_info  = {};
-    app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pApplicationName   = "Hello Triangle";
-    app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    app_info.pEngineName        = "No Engine";
-    app_info.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-    app_info.apiVersion         = VK_API_VERSION_1_0;
-
-    VkInstanceCreateInfo create_info = {};
-    create_info.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info.pApplicationInfo     = &app_info;
+    vk::ApplicationInfo app_info("Materialist", 1, "No-engine", 1, VK_MAKE_VERSION(1, 1, 0));
 
     const auto extensions = get_required_extensions();
 
-    create_info.enabledExtensionCount =
-        static_cast<uint32_t>(extensions.size());
-    create_info.ppEnabledExtensionNames = extensions.data();
+    vk::InstanceCreateInfo create_info({}, &app_info,
 #ifndef NDEBUG
-    create_info.enabledLayerCount =
-        static_cast<uint32_t>(validation_layers.size());
-    create_info.ppEnabledLayerNames = validation_layers.data();
+        gsl::narrow<uint32_t>(validation_layers.size()),
+        validation_layers.data(),
+#else // Release
+        0, nullptr,
+#endif // NDEBUG
+        gsl::narrow<uint32_t>(extensions.size()),
+        extensions.data());
+
+#ifndef NDEBUG
 
     VkDebugUtilsMessengerCreateInfoEXT debug_create_info;
     populate_debug_messenger_create_info(debug_create_info);
-    create_info.pNext = reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT*>(
-        &debug_create_info);
-#else  // NDEBUG
-    create_info.enabledLayerCount = 0;
+    create_info.setPNext(&debug_create_info);
+
 #endif // NDEBUG
 
-    if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS) {
+    auto [result, instance] = vk::createInstanceUnique(create_info);
+    if (result != vk::Result::eSuccess) {
         error("failed to create instance!");
         std::terminate();
     }
@@ -1324,7 +1317,7 @@ create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
 }
 
 std::tuple<
-    VkInstance,
+    vk::UniqueInstance,
     VkDevice,
     VkQueue,
     VkQueue,
@@ -1356,19 +1349,19 @@ init_vulkan(
 #endif // NDEBUG
     ) noexcept
 {
-    auto instance = std::move(create_instance(
+    auto instance = create_instance(
 #ifndef NDEBUG
         validation_layers
 #endif // NDEBUG
-        ));
+        );
 
 #ifndef NDEBUG
-    setup_debug_messenger(instance, debug_messenger);
+    setup_debug_messenger(*instance, debug_messenger);
 #endif // NDEBUG
 
-    VkSurfaceKHR surface = create_surface(instance, window);
+    VkSurfaceKHR surface = create_surface(*instance, window);
     auto         physical_device =
-        pick_physical_device(instance, surface, device_extensions);
+        pick_physical_device(*instance, surface, device_extensions);
     auto [device, graphics_queue, present_queue] = create_logical_device(
         physical_device,
         surface,
@@ -1553,7 +1546,7 @@ draw_frame(
 
 void
 cleanup(
-    VkInstance                  instance,
+    vk::UniqueInstance&         instance,
     VkDevice                    device,
     VkSurfaceKHR                surface,
     VkSwapchainKHR              swapchain,
@@ -1574,15 +1567,8 @@ cleanup(
     ) noexcept
 {
 #ifndef NDEBUG
-    destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
+    destroy_debug_utils_messenger_EXT(*instance, debug_messenger, nullptr);
 #endif // NDEBUG
-
-    // std::for_each(
-    //     begin(images_inflight),
-    //     end(images_inflight),
-    //     [&device](auto& image_inflight) {
-    //         vkDestroyFence(device, image_inflight, nullptr);
-    //     });
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
@@ -1606,8 +1592,7 @@ cleanup(
 
     vkDestroySwapchainKHR(device, swapchain, nullptr);
     vkDestroyDevice(device, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
+    vkDestroySurfaceKHR(*instance, surface, nullptr);
     glfwDestroyWindow(window);
     glfwTerminate();
 }
