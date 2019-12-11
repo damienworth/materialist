@@ -21,6 +21,12 @@ using spdlog::info;
 using spdlog::log;
 using spdlog::warn;
 
+#define ERROR(...)              \
+    spdlog::error(__VA_ARGS__); \
+    std::terminate();
+
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
 namespace application {
 
 namespace /* anonymous */ {
@@ -32,13 +38,13 @@ void populate_debug_messenger_create_info(
     VkDebugUtilsMessengerCreateInfoEXT&) noexcept;
 
 VkResult create_debug_utils_messenger_EXT(
-    VkInstance,
+    vk::UniqueInstance&,
     const VkDebugUtilsMessengerCreateInfoEXT*,
     const VkAllocationCallbacks*,
     VkDebugUtilsMessengerEXT*) noexcept;
 
 void destroy_debug_utils_messenger_EXT(
-    VkInstance,
+    vk::UniqueInstance&,
     VkDebugUtilsMessengerEXT,
     const VkAllocationCallbacks*) noexcept;
 
@@ -54,20 +60,23 @@ vk::UniqueInstance create_instance(
 GLFWwindow* init_window(std::string_view, int, int) noexcept;
 
 #ifndef NDEBUG
-void setup_debug_messenger(VkInstance, VkDebugUtilsMessengerEXT&) noexcept;
+void
+setup_debug_messenger(vk::UniqueInstance&, VkDebugUtilsMessengerEXT&) noexcept;
 #endif // NDEBUG
 
 bool is_device_suitable(
-    VkPhysicalDevice, VkSurfaceKHR, const std::vector<const char*>&) noexcept;
+    vk::PhysicalDevice, VkSurfaceKHR, const std::vector<const char*>&) noexcept;
 
 bool check_device_extension_support(
-    VkPhysicalDevice, const std::vector<const char*>&) noexcept;
+    vk::PhysicalDevice, const std::vector<const char*>&) noexcept;
 
-VkPhysicalDevice pick_physical_device(
-    VkInstance, VkSurfaceKHR, const std::vector<const char*>&) noexcept;
+vk::PhysicalDevice pick_physical_device(
+    vk::UniqueInstance&,
+    VkSurfaceKHR,
+    const std::vector<const char*>&) noexcept;
 
 std::tuple<VkDevice, VkQueue, VkQueue> create_logical_device(
-    VkPhysicalDevice,
+    vk::PhysicalDevice,
     VkSurfaceKHR,
     const std::vector<const char*>&
 #ifndef NDEBUG
@@ -76,7 +85,7 @@ std::tuple<VkDevice, VkQueue, VkQueue> create_logical_device(
 #endif // NDEBUG
     ) noexcept;
 
-VkSurfaceKHR create_surface(VkInstance, GLFWwindow*) noexcept;
+VkSurfaceKHR create_surface(vk::UniqueInstance&, GLFWwindow*) noexcept;
 
 struct queue_family_indices {
     std::optional<uint32_t> graphics_family;
@@ -93,10 +102,10 @@ struct swap_chainsupport_details {
     operator bool() const { return !formats.empty() && !present_modes.empty(); }
 };
 
-queue_family_indices find_queue_families(VkPhysicalDevice, VkSurfaceKHR);
+queue_family_indices find_queue_families(vk::PhysicalDevice, VkSurfaceKHR);
 
 swap_chainsupport_details
-    query_swap_chainsupport(VkPhysicalDevice, VkSurfaceKHR) noexcept;
+    query_swap_chainsupport(vk::PhysicalDevice, VkSurfaceKHR) noexcept;
 
 VkSurfaceFormatKHR
 choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>&);
@@ -108,7 +117,7 @@ VkExtent2D choose_swap_extent(
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
     VkDevice,
-    VkPhysicalDevice,
+    vk::PhysicalDevice,
     VkSurfaceKHR,
     VkFormat&,
     VkExtent2D&,
@@ -130,7 +139,7 @@ std::vector<VkFramebuffer> create_framebuffers(
     VkExtent2D) noexcept;
 
 VkCommandPool
-    create_command_pool(VkDevice, VkPhysicalDevice, VkSurfaceKHR) noexcept;
+    create_command_pool(VkDevice, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
 
 std::vector<VkCommandBuffer> create_command_buffers(
     VkDevice,
@@ -268,7 +277,7 @@ hello_triangle::run() noexcept
         _render_finished_semaphores,
         _inflight_fences,
         _images_inflight) =
-        std::move(init_vulkan(
+        init_vulkan(
             _window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
             _WIDTH,
@@ -278,7 +287,7 @@ hello_triangle::run() noexcept
             _debug_messenger,
             _validation_layers
 #endif // NDEBUG
-            ));
+        );
     main_loop(
         _device,
         _graphics_queue,
@@ -335,15 +344,15 @@ populate_debug_messenger_create_info(
 
 VkResult
 create_debug_utils_messenger_EXT(
-    VkInstance                                instance,
+    vk::UniqueInstance&                       instance,
     const VkDebugUtilsMessengerCreateInfoEXT* create_info,
     const VkAllocationCallbacks*              allocator,
     VkDebugUtilsMessengerEXT*                 debug_messenger) noexcept
 {
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+        vkGetInstanceProcAddr(*instance, "vkCreateDebugUtilsMessengerEXT"));
     if (func != nullptr) {
-        return func(instance, create_info, allocator, debug_messenger);
+        return func(*instance, create_info, allocator, debug_messenger);
     }
 
     return VK_ERROR_EXTENSION_NOT_PRESENT;
@@ -351,13 +360,13 @@ create_debug_utils_messenger_EXT(
 
 void
 destroy_debug_utils_messenger_EXT(
-    VkInstance                   instance,
+    vk::UniqueInstance&          instance,
     VkDebugUtilsMessengerEXT     debug_messenger,
     const VkAllocationCallbacks* allocator) noexcept
 {
     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
-    if (func) { func(instance, debug_messenger, allocator); }
+        vkGetInstanceProcAddr(*instance, "vkDestroyDebugUtilsMessengerEXT"));
+    if (func) { func(*instance, debug_messenger, allocator); }
 }
 
 bool
@@ -402,21 +411,24 @@ create_instance(
 {
 #ifndef NDEBUG
     if (!check_validation_layer_support(validation_layers)) {
-        error("validation layers requested, but not available!");
-        std::terminate();
+        ERROR("validation layers requested, but not available!");
     }
 #endif // NDEBUG
 
-    vk::ApplicationInfo app_info("Materialist", 1, "No-engine", 1, VK_MAKE_VERSION(1, 1, 0));
+    vk::ApplicationInfo app_info(
+        "Materialist", 1, "No-engine", 1, VK_MAKE_VERSION(1, 1, 0));
 
     const auto extensions = get_required_extensions();
 
-    vk::InstanceCreateInfo create_info({}, &app_info,
+    vk::InstanceCreateInfo create_info(
+        {},
+        &app_info,
 #ifndef NDEBUG
         gsl::narrow<uint32_t>(validation_layers.size()),
         validation_layers.data(),
-#else // Release
-        0, nullptr,
+#else  // Release
+        0,
+        nullptr,
 #endif // NDEBUG
         gsl::narrow<uint32_t>(extensions.size()),
         extensions.data());
@@ -430,10 +442,7 @@ create_instance(
 #endif // NDEBUG
 
     auto [result, instance] = vk::createInstanceUnique(create_info);
-    if (result != vk::Result::eSuccess) {
-        error("failed to create instance!");
-        std::terminate();
-    }
+    if (result != vk::Result::eSuccess) { ERROR("failed to create instance!"); }
 
     uint32_t extension_props_count = 0;
     vkEnumerateInstanceExtensionProperties(
@@ -466,22 +475,22 @@ init_window(std::string_view caption, int width, int height) noexcept
 #ifndef NDEBUG
 void
 setup_debug_messenger(
-    VkInstance instance, VkDebugUtilsMessengerEXT& debug_messenger) noexcept
+    vk::UniqueInstance&       instance,
+    VkDebugUtilsMessengerEXT& debug_messenger) noexcept
 {
     VkDebugUtilsMessengerCreateInfoEXT create_info;
     populate_debug_messenger_create_info(create_info);
 
     if (create_debug_utils_messenger_EXT(
             instance, &create_info, nullptr, &debug_messenger) != VK_SUCCESS) {
-        error("failed to set up debug messenger!");
-        std::terminate();
+        ERROR("failed to set up debug messenger!");
     }
 }
 #endif // NDEBUG
 
 bool
 is_device_suitable(
-    VkPhysicalDevice                physical_device,
+    vk::PhysicalDevice              physical_device,
     VkSurfaceKHR                    surface,
     const std::vector<const char*>& device_extensions) noexcept
 {
@@ -508,7 +517,7 @@ is_device_suitable(
 
 bool
 check_device_extension_support(
-    VkPhysicalDevice                physical_device,
+    vk::PhysicalDevice              physical_device,
     const std::vector<const char*>& device_extensions) noexcept
 {
     uint32_t extension_count;
@@ -530,51 +539,40 @@ check_device_extension_support(
 
 #ifndef NDEBUG
     for (const auto& extension : required_extensions) {
-        error("extension {} is not supported", extension);
+        ERROR("extension {} is not supported", extension);
     }
 #endif // NDEBUG
 
     return required_extensions.empty();
 }
 
-VkPhysicalDevice
+vk::PhysicalDevice
 pick_physical_device(
-    VkInstance                      instance,
+    vk::UniqueInstance&             instance,
     VkSurfaceKHR                    surface,
     const std::vector<const char*>& device_extensions) noexcept
 {
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-
-    uint32_t device_count = 0;
-    vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
-
-    if (!device_count) {
-        error("failed to find GPUs with Vulkan support");
-        std::terminate();
+    vk::PhysicalDevice physical_device;
+    auto [result, devices] = instance->enumeratePhysicalDevices();
+    if (result != vk::Result::eSuccess) {
+        ERROR("failed to find GPUs with Vulkan support");
     }
 
-    std::vector<VkPhysicalDevice> devices(device_count);
-    vkEnumeratePhysicalDevices(instance, &device_count, devices.data());
+    auto right_device = [&surface, &device_extensions](const auto& device) {
+        return is_device_suitable(device, surface, device_extensions);
+    };
 
-    auto suitable_it = std::find_if(
-        begin(devices),
-        end(devices),
-        [&surface, &device_extensions](const auto& device) {
-            return is_device_suitable(device, surface, device_extensions);
-        });
+    auto suitable_it = std::find_if(begin(devices), end(devices), right_device);
     if (suitable_it != end(devices)) { physical_device = *suitable_it; }
 
-    if (physical_device == VK_NULL_HANDLE) {
-        error("failed to find suitable GPU");
-        std::terminate();
-    }
+    if (!physical_device) { ERROR("failed to find suitable GPU"); }
 
     return physical_device;
 }
 
 std::tuple<VkDevice, VkQueue, VkQueue>
 create_logical_device(
-    VkPhysicalDevice                physical_device,
+    vk::PhysicalDevice              physical_device,
     VkSurfaceKHR                    surface,
     const std::vector<const char*>& device_extensions
 #ifndef NDEBUG
@@ -626,8 +624,7 @@ create_logical_device(
     VkDevice device;
     if (vkCreateDevice(physical_device, &create_info, nullptr, &device) !=
         VK_SUCCESS) {
-        error("failed to create logical device!");
-        std::terminate();
+        ERROR("failed to create logical device!");
     }
 
     VkQueue graphics_queue;
@@ -640,20 +637,19 @@ create_logical_device(
 }
 
 VkSurfaceKHR
-create_surface(VkInstance instance, GLFWwindow* window) noexcept
+create_surface(vk::UniqueInstance& instance, GLFWwindow* window) noexcept
 {
     VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) !=
+    if (glfwCreateWindowSurface(*instance, window, nullptr, &surface) !=
         VK_SUCCESS) {
-        error("failed to create window surface");
-        std::terminate();
+        ERROR("failed to create window surface");
     }
 
     return surface;
 }
 
 queue_family_indices
-find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface)
+find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface)
 {
     queue_family_indices indices;
 
@@ -692,7 +688,7 @@ find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface)
 
 swap_chainsupport_details
 query_swap_chainsupport(
-    VkPhysicalDevice physical_device, VkSurfaceKHR surface) noexcept
+    vk::PhysicalDevice physical_device, VkSurfaceKHR surface) noexcept
 {
     swap_chainsupport_details details;
 
@@ -779,13 +775,13 @@ choose_swap_extent(
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>>
 create_swapchain(
-    VkDevice         device,
-    VkPhysicalDevice physical_device,
-    VkSurfaceKHR     surface,
-    VkFormat&        swapchain_image_format,
-    VkExtent2D&      swapchain_extent,
-    int              width,
-    int              height) noexcept
+    VkDevice           device,
+    vk::PhysicalDevice physical_device,
+    VkSurfaceKHR       surface,
+    VkFormat&          swapchain_image_format,
+    VkExtent2D&        swapchain_extent,
+    int                width,
+    int                height) noexcept
 {
     swap_chainsupport_details swap_chainsupport =
         query_swap_chainsupport(physical_device, surface);
@@ -836,8 +832,7 @@ create_swapchain(
     VkSwapchainKHR swapchain;
     if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain) !=
         VK_SUCCESS) {
-        error("failed to create swap chain!");
-        std::terminate();
+        ERROR("failed to create swap chain!");
     }
 
     std::vector<VkImage> swapchain_images;
@@ -878,8 +873,7 @@ create_image_views(
         if (vkCreateImageView(
                 device, &create_info, nullptr, &swapchain_image_views[i]) !=
             VK_SUCCESS) {
-            error("failed to create image views");
-            std::terminate();
+            ERROR("failed to create image views");
         }
     }
 
@@ -929,8 +923,7 @@ create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
     VkRenderPass render_pass;
     if (vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass) !=
         VK_SUCCESS) {
-        error("failed to create render pass");
-        std::terminate();
+        ERROR("failed to create render pass");
     }
 
     return render_pass;
@@ -1068,8 +1061,7 @@ create_graphics_pipeline(
     if (vkCreatePipelineLayout(
             device, &pipeline_layout_info, nullptr, &pipeline_layout) !=
         VK_SUCCESS) {
-        error("failed to create pipeline layout");
-        std::terminate();
+        ERROR("failed to create pipeline layout");
     }
 
     VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info,
@@ -1101,8 +1093,7 @@ create_graphics_pipeline(
             &pipeline_info,
             nullptr,
             &graphics_pipeline) != VK_SUCCESS) {
-        error("failed to create graphics pipeline");
-        std::terminate();
+        ERROR("failed to create graphics pipeline");
     }
 
     vkDestroyShaderModule(device, frag_shader_module, nullptr);
@@ -1138,8 +1129,7 @@ create_framebuffers(
                 &framebuffer_info,
                 nullptr,
                 &swapchain_framebuffers[i]) != VK_SUCCESS) {
-            error("failed to create framebuffer");
-            std::terminate();
+            ERROR("failed to create framebuffer");
         }
     }
 
@@ -1148,9 +1138,9 @@ create_framebuffers(
 
 VkCommandPool
 create_command_pool(
-    VkDevice         device,
-    VkPhysicalDevice physical_device,
-    VkSurfaceKHR     surface) noexcept
+    VkDevice           device,
+    vk::PhysicalDevice physical_device,
+    VkSurfaceKHR       surface) noexcept
 {
     auto indices = find_queue_families(physical_device, surface);
 
@@ -1162,8 +1152,7 @@ create_command_pool(
     VkCommandPool command_pool;
     if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) !=
         VK_SUCCESS) {
-        error("failed to create command pool");
-        std::terminate();
+        ERROR("failed to create command pool");
     }
 
     return command_pool;
@@ -1190,8 +1179,7 @@ create_command_buffers(
 
     if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data()) !=
         VK_SUCCESS) {
-        error("failed to allocate command buffers");
-        std::terminate();
+        ERROR("failed to allocate command buffers");
     }
 
     for (size_t i = 0; i != command_buffers.size(); ++i) {
@@ -1202,8 +1190,7 @@ create_command_buffers(
 
         if (vkBeginCommandBuffer(command_buffers[i], &begin_info) !=
             VK_SUCCESS) {
-            error("failed to begin recording command buffer");
-            std::terminate();
+            ERROR("failed to begin recording command buffer");
         }
 
         VkRenderPassBeginInfo render_pass_info = {};
@@ -1227,8 +1214,7 @@ create_command_buffers(
         vkCmdEndRenderPass(command_buffers[i]);
 
         if (vkEndCommandBuffer(command_buffers[i]) != VK_SUCCESS) {
-            error("failed to record command buffer");
-            std::terminate();
+            ERROR("failed to record command buffer");
         }
     }
 
@@ -1269,8 +1255,7 @@ create_sync_objects(
                 &render_finished_semaphores[i]) != VK_SUCCESS ||
             vkCreateFence(device, &fence_info, nullptr, &inflight_fences[i]) !=
                 VK_SUCCESS) {
-            error("failed to create synchronization objects for a frame");
-            std::terminate();
+            ERROR("failed to create synchronization objects for a frame");
         }
     }
 
@@ -1284,10 +1269,7 @@ std::vector<char>
 read_file(std::string_view filename) noexcept
 {
     std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-    if (!file) {
-        error("failed to open file {}", filename);
-        std::terminate();
-    }
+    if (!file) { ERROR("failed to open file {}", filename); }
 
     const auto        file_size = file.tellg();
     std::vector<char> buffer(file_size);
@@ -1309,8 +1291,7 @@ create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
     VkShaderModule shader_module;
     if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) !=
         VK_SUCCESS) {
-        error("failed to create shader module");
-        std::terminate();
+        ERROR("failed to create shader module");
     }
 
     return shader_module;
@@ -1349,19 +1330,24 @@ init_vulkan(
 #endif // NDEBUG
     ) noexcept
 {
+    vk::DynamicLoader dl;
+    auto              vkInstanceProcAddr =
+        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkInstanceProcAddr);
     auto instance = create_instance(
 #ifndef NDEBUG
         validation_layers
 #endif // NDEBUG
-        );
+    );
 
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 #ifndef NDEBUG
-    setup_debug_messenger(*instance, debug_messenger);
+    setup_debug_messenger(instance, debug_messenger);
 #endif // NDEBUG
 
-    VkSurfaceKHR surface = create_surface(*instance, window);
+    VkSurfaceKHR surface = create_surface(instance, window);
     auto         physical_device =
-        pick_physical_device(*instance, surface, device_extensions);
+        pick_physical_device(instance, surface, device_extensions);
     auto [device, graphics_queue, present_queue] = create_logical_device(
         physical_device,
         surface,
@@ -1522,8 +1508,7 @@ draw_frame(
     if (vkQueueSubmit(
             graphics_queue, 1, &submit_info, inflight_fences[current_frame]) !=
         VK_SUCCESS) {
-        error("failed to submit draw command buffer");
-        std::terminate();
+        ERROR("failed to submit draw command buffer");
     }
 
     VkPresentInfoKHR present_info   = {};
@@ -1567,7 +1552,7 @@ cleanup(
     ) noexcept
 {
 #ifndef NDEBUG
-    destroy_debug_utils_messenger_EXT(*instance, debug_messenger, nullptr);
+    destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
 #endif // NDEBUG
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
