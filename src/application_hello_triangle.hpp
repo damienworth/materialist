@@ -24,7 +24,8 @@ class hello_triangle {
     vk::UniqueDevice             _device;
     vk::Queue                    _graphics_queue;
     vk::Queue                    _present_queue;
-    VkSwapchainKHR               _swapchain;
+    vk::UniqueSurfaceKHR         _surface;
+    vk::UniqueSwapchainKHR       _swapchain;
     std::vector<VkImage>         _swapchain_images;
     VkFormat                     _swapchain_image_format;
     VkExtent2D                   _swapchain_extent;
@@ -40,8 +41,6 @@ class hello_triangle {
     std::vector<VkFence>         _inflight_fences;
     std::vector<VkFence>         _images_inflight;
     size_t                       _current_frame = 0;
-
-    VkSurfaceKHR _surface;
 
 #ifndef NDEBUG
     const std::vector<const char*> _validation_layers = {

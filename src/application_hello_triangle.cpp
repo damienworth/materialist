@@ -55,19 +55,21 @@ auto setup_debug_messenger(vk::UniqueInstance&) noexcept;
 #endif // NDEBUG
 
 bool is_device_suitable(
-    vk::PhysicalDevice, VkSurfaceKHR, const std::vector<const char*>&) noexcept;
+    vk::PhysicalDevice,
+    vk::UniqueSurfaceKHR&,
+    const std::vector<const char*>&) noexcept;
 
 bool check_device_extension_support(
     vk::PhysicalDevice, const std::vector<const char*>&) noexcept;
 
 vk::PhysicalDevice pick_physical_device(
     vk::UniqueInstance&,
-    VkSurfaceKHR,
+    vk::UniqueSurfaceKHR&,
     const std::vector<const char*>&) noexcept;
 
 std::tuple<vk::UniqueDevice, vk::Queue, VkQueue> create_logical_device(
     vk::PhysicalDevice,
-    VkSurfaceKHR,
+    vk::UniqueSurfaceKHR&,
     const std::vector<const char*>&
 #ifndef NDEBUG
     ,
@@ -75,7 +77,7 @@ std::tuple<vk::UniqueDevice, vk::Queue, VkQueue> create_logical_device(
 #endif // NDEBUG
     ) noexcept;
 
-VkSurfaceKHR create_surface(vk::UniqueInstance&, GLFWwindow*) noexcept;
+vk::UniqueSurfaceKHR create_surface(vk::UniqueInstance&, GLFWwindow*) noexcept;
 
 struct queue_family_indices {
     std::optional<uint32_t> graphics_family;
@@ -92,10 +94,11 @@ struct swap_chainsupport_details {
     operator bool() const { return !formats.empty() && !present_modes.empty(); }
 };
 
-queue_family_indices find_queue_families(vk::PhysicalDevice, VkSurfaceKHR);
+queue_family_indices
+find_queue_families(vk::PhysicalDevice, vk::UniqueSurfaceKHR&);
 
 swap_chainsupport_details
-    query_swap_chainsupport(vk::PhysicalDevice, VkSurfaceKHR) noexcept;
+query_swap_chainsupport(vk::PhysicalDevice, vk::UniqueSurfaceKHR&) noexcept;
 
 VkSurfaceFormatKHR
 choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>&);
@@ -105,10 +108,10 @@ VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>&);
 VkExtent2D choose_swap_extent(
     const VkSurfaceCapabilitiesKHR&, int width, int height) noexcept;
 
-std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
+std::tuple<vk::UniqueSwapchainKHR, std::vector<VkImage>> create_swapchain(
     vk::UniqueDevice&,
     vk::PhysicalDevice,
-    VkSurfaceKHR,
+    vk::UniqueSurfaceKHR&,
     VkFormat&,
     VkExtent2D&,
     int,
@@ -129,7 +132,7 @@ std::vector<VkFramebuffer> create_framebuffers(
     VkExtent2D) noexcept;
 
 VkCommandPool create_command_pool(
-    vk::UniqueDevice&, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
+    vk::UniqueDevice&, vk::PhysicalDevice, vk::UniqueSurfaceKHR&) noexcept;
 
 std::vector<VkCommandBuffer> create_command_buffers(
     vk::UniqueDevice&,
@@ -159,8 +162,8 @@ std::tuple<
     vk::UniqueDevice,
     vk::Queue,
     vk::Queue,
-    VkSurfaceKHR,
-    VkSwapchainKHR,
+    vk::UniqueSurfaceKHR,
+    vk::UniqueSwapchainKHR,
     std::vector<VkImage>,
     VkFormat,
     VkExtent2D,
@@ -190,7 +193,7 @@ void main_loop(
     vk::UniqueDevice&,
     vk::Queue,
     vk::Queue,
-    VkSwapchainKHR,
+    vk::UniqueSwapchainKHR&,
     const std::vector<VkCommandBuffer>&,
     const std::vector<VkSemaphore>&,
     const std::vector<VkSemaphore>&,
@@ -203,7 +206,7 @@ void draw_frame(
     vk::UniqueDevice&,
     vk::Queue,
     vk::Queue,
-    VkSwapchainKHR,
+    vk::UniqueSwapchainKHR&,
     const std::vector<VkCommandBuffer>&,
     const std::vector<VkSemaphore>&,
     const std::vector<VkSemaphore>&,
@@ -212,10 +215,7 @@ void draw_frame(
     size_t&) noexcept;
 
 void cleanup(
-    vk::UniqueInstance&,
     vk::UniqueDevice&,
-    VkSurfaceKHR,
-    VkSwapchainKHR,
     std::vector<VkImageView>&,
     VkPipelineLayout,
     VkPipeline,
@@ -290,10 +290,7 @@ hello_triangle::run() noexcept
         _current_frame,
         _window);
     cleanup(
-        _instance,
         _device,
-        _surface,
-        _swapchain,
         _swapchain_image_views,
         _pipeline_layout,
         _graphics_pipeline,
@@ -453,7 +450,7 @@ setup_debug_messenger(vk::UniqueInstance& instance) noexcept
 bool
 is_device_suitable(
     vk::PhysicalDevice              physical_device,
-    VkSurfaceKHR                    surface,
+    vk::UniqueSurfaceKHR&           surface,
     const std::vector<const char*>& device_extensions) noexcept
 {
     VkPhysicalDeviceProperties device_properties;
@@ -511,7 +508,7 @@ check_device_extension_support(
 vk::PhysicalDevice
 pick_physical_device(
     vk::UniqueInstance&             instance,
-    VkSurfaceKHR                    surface,
+    vk::UniqueSurfaceKHR&           surface,
     const std::vector<const char*>& device_extensions) noexcept
 {
     vk::PhysicalDevice physical_device;
@@ -535,7 +532,7 @@ pick_physical_device(
 std::tuple<vk::UniqueDevice, vk::Queue, VkQueue>
 create_logical_device(
     vk::PhysicalDevice              physical_device,
-    VkSurfaceKHR                    surface,
+    vk::UniqueSurfaceKHR&           surface,
     const std::vector<const char*>& device_extensions
 #ifndef NDEBUG
     ,
@@ -554,7 +551,7 @@ create_logical_device(
             })));
 
     auto [spmresult, present_modes] =
-        physical_device.getSurfacePresentModesKHR(surface);
+        physical_device.getSurfacePresentModesKHR(*surface);
     if (spmresult != vk::Result::eSuccess) {
         ERROR("failed to get surface present modes");
     }
@@ -606,20 +603,22 @@ create_logical_device(
     return std::tuple{std::move(device), graphics_queue, present_queue};
 }
 
-VkSurfaceKHR
+vk::UniqueSurfaceKHR
 create_surface(vk::UniqueInstance& instance, GLFWwindow* window) noexcept
 {
-    VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(*instance, window, nullptr, &surface) !=
+    VkSurfaceKHR surface_tmp;
+    if (glfwCreateWindowSurface(*instance, window, nullptr, &surface_tmp) !=
         VK_SUCCESS) {
         ERROR("failed to create window surface");
     }
 
-    return surface;
+    vk::UniqueSurfaceKHR surface(surface_tmp, *instance);
+
+    return std::move(surface);
 }
 
 queue_family_indices
-find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface)
+find_queue_families(vk::PhysicalDevice device, vk::UniqueSurfaceKHR& surface)
 {
     queue_family_indices indices;
 
@@ -646,7 +645,7 @@ find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface)
     VkBool32 present_support = false;
     for (int idx = 0; idx != static_cast<int>(queue_families.size()); ++idx) {
         vkGetPhysicalDeviceSurfaceSupportKHR(
-            device, idx, surface, &present_support);
+            device, idx, *surface, &present_support);
         if (present_support) {
             indices.present_family = idx;
             break;
@@ -658,31 +657,31 @@ find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface)
 
 swap_chainsupport_details
 query_swap_chainsupport(
-    vk::PhysicalDevice physical_device, VkSurfaceKHR surface) noexcept
+    vk::PhysicalDevice physical_device, vk::UniqueSurfaceKHR& surface) noexcept
 {
     swap_chainsupport_details details;
 
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        physical_device, surface, &details.capabilities);
+        physical_device, *surface, &details.capabilities);
 
     uint32_t format_count;
     vkGetPhysicalDeviceSurfaceFormatsKHR(
-        physical_device, surface, &format_count, nullptr);
+        physical_device, *surface, &format_count, nullptr);
 
     if (format_count) {
         details.formats.resize(format_count);
         vkGetPhysicalDeviceSurfaceFormatsKHR(
-            physical_device, surface, &format_count, details.formats.data());
+            physical_device, *surface, &format_count, details.formats.data());
     }
 
     uint32_t present_mode_count;
     vkGetPhysicalDeviceSurfacePresentModesKHR(
-        physical_device, surface, &present_mode_count, nullptr);
+        physical_device, *surface, &present_mode_count, nullptr);
     if (present_mode_count) {
         details.present_modes.resize(present_mode_count);
         vkGetPhysicalDeviceSurfacePresentModesKHR(
             physical_device,
-            surface,
+            *surface,
             &present_mode_count,
             details.present_modes.data());
     }
@@ -743,15 +742,15 @@ choose_swap_extent(
     return actual_extent;
 }
 
-std::tuple<VkSwapchainKHR, std::vector<VkImage>>
+std::tuple<vk::UniqueSwapchainKHR, std::vector<VkImage>>
 create_swapchain(
-    vk::UniqueDevice&  device,
-    vk::PhysicalDevice physical_device,
-    VkSurfaceKHR       surface,
-    VkFormat&          swapchain_image_format,
-    VkExtent2D&        swapchain_extent,
-    int                width,
-    int                height) noexcept
+    vk::UniqueDevice&     device,
+    vk::PhysicalDevice    physical_device,
+    vk::UniqueSurfaceKHR& surface,
+    VkFormat&             swapchain_image_format,
+    VkExtent2D&           swapchain_extent,
+    int                   width,
+    int                   height) noexcept
 {
     swap_chainsupport_details swap_chainsupport =
         query_swap_chainsupport(physical_device, surface);
@@ -771,7 +770,7 @@ create_swapchain(
 
     VkSwapchainCreateInfoKHR create_info = {};
     create_info.sType   = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    create_info.surface = surface;
+    create_info.surface = *surface;
 
     create_info.minImageCount    = image_count;
     create_info.imageFormat      = surface_format.format;
@@ -799,17 +798,13 @@ create_swapchain(
     create_info.clipped        = VK_TRUE;
     create_info.oldSwapchain   = VK_NULL_HANDLE;
 
-    VkSwapchainKHR swapchain;
-    if (vkCreateSwapchainKHR(*device, &create_info, nullptr, &swapchain) !=
-        VK_SUCCESS) {
-        ERROR("failed to create swap chain!");
-    }
-
+    auto [result, swapchain] = device->createSwapchainKHRUnique(create_info);
+    if (result != vk::Result::eSuccess) { ERROR("failed to create swapchain"); }
     std::vector<VkImage> swapchain_images;
-    vkGetSwapchainImagesKHR(*device, swapchain, &image_count, nullptr);
+    vkGetSwapchainImagesKHR(*device, *swapchain, &image_count, nullptr);
     swapchain_images.resize(image_count);
     vkGetSwapchainImagesKHR(
-        *device, swapchain, &image_count, swapchain_images.data());
+        *device, *swapchain, &image_count, swapchain_images.data());
     swapchain_image_format = surface_format.format;
     swapchain_extent       = extent;
 
@@ -1109,9 +1104,9 @@ create_framebuffers(
 
 VkCommandPool
 create_command_pool(
-    vk::UniqueDevice&  device,
-    vk::PhysicalDevice physical_device,
-    VkSurfaceKHR       surface) noexcept
+    vk::UniqueDevice&     device,
+    vk::PhysicalDevice    physical_device,
+    vk::UniqueSurfaceKHR& surface) noexcept
 {
     auto indices = find_queue_families(physical_device, surface);
 
@@ -1278,8 +1273,8 @@ std::tuple<
     vk::UniqueDevice,
     vk::Queue,
     vk::Queue,
-    VkSurfaceKHR,
-    VkSwapchainKHR,
+    vk::UniqueSurfaceKHR,
+    vk::UniqueSwapchainKHR,
     std::vector<VkImage>,
     VkFormat,
     VkExtent2D,
@@ -1320,8 +1315,8 @@ init_vulkan(
     auto debug_messenger = setup_debug_messenger(instance);
 #endif // NDEBUG
 
-    VkSurfaceKHR surface = create_surface(instance, window);
-    auto         physical_device =
+    vk::UniqueSurfaceKHR surface = create_surface(instance, window);
+    auto                 physical_device =
         pick_physical_device(instance, surface, device_extensions);
     auto [device, graphics_queue, present_queue] = create_logical_device(
         physical_device,
@@ -1403,7 +1398,7 @@ main_loop(
     vk::UniqueDevice&                   device,
     vk::Queue                           graphics_queue,
     vk::Queue                           present_queue,
-    VkSwapchainKHR                      swapchain,
+    vk::UniqueSwapchainKHR&             swapchain,
     const std::vector<VkCommandBuffer>& command_buffers,
     const std::vector<VkSemaphore>&     image_available_semaphores,
     const std::vector<VkSemaphore>&     render_finished_semaphores,
@@ -1436,7 +1431,7 @@ draw_frame(
     vk::UniqueDevice&                   device,
     vk::Queue                           graphics_queue,
     vk::Queue                           present_queue,
-    VkSwapchainKHR                      swapchain,
+    vk::UniqueSwapchainKHR&             swapchain,
     const std::vector<VkCommandBuffer>& command_buffers,
     const std::vector<VkSemaphore>&     image_available_semaphores,
     const std::vector<VkSemaphore>&     render_finished_semaphores,
@@ -1450,7 +1445,7 @@ draw_frame(
     uint32_t image_index;
     vkAcquireNextImageKHR(
         *device,
-        swapchain,
+        *swapchain,
         UINT64_MAX,
         image_available_semaphores[current_frame],
         VK_NULL_HANDLE,
@@ -1495,7 +1490,7 @@ draw_frame(
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores    = signal_semaphores;
 
-    VkSwapchainKHR swapchains[] = {swapchain};
+    VkSwapchainKHR swapchains[] = {*swapchain};
     present_info.swapchainCount = 1;
     present_info.pSwapchains    = swapchains;
     present_info.pImageIndices  = &image_index;
@@ -1510,10 +1505,7 @@ draw_frame(
 
 void
 cleanup(
-    vk::UniqueInstance&         instance,
     vk::UniqueDevice&           device,
-    VkSurfaceKHR                surface,
-    VkSwapchainKHR              swapchain,
     std::vector<VkImageView>&   swapchain_image_views,
     VkPipelineLayout            pipeline_layout,
     VkPipeline                  graphics_pipeline,
@@ -1545,8 +1537,6 @@ cleanup(
         vkDestroyImageView(*device, image_view, nullptr);
     }
 
-    vkDestroySwapchainKHR(*device, swapchain, nullptr);
-    vkDestroySurfaceKHR(*instance, surface, nullptr);
     glfwDestroyWindow(window);
     glfwTerminate();
 }
