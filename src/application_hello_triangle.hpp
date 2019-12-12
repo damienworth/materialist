@@ -15,7 +15,8 @@ class hello_triangle {
     const int   _HEIGHT = 600;
 
 #ifndef NDEBUG
-    vk::DebugUtilsMessengerEXT _debug_messenger;
+    vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>
+        _debug_messenger;
 #endif // NDEBUG
 
     vk::UniqueInstance           _instance;

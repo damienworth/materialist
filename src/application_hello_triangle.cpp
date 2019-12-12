@@ -34,19 +34,10 @@ namespace /* anonymous */ {
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 #ifndef NDEBUG
-void populate_debug_messenger_create_info(
-    VkDebugUtilsMessengerCreateInfoEXT&) noexcept;
+vk::DebugUtilsMessengerCreateInfoEXT
+populate_debug_messenger_create_info() noexcept;
 
-VkResult create_debug_utils_messenger_EXT(
-    vk::UniqueInstance&,
-    const VkDebugUtilsMessengerCreateInfoEXT*,
-    const VkAllocationCallbacks*,
-    VkDebugUtilsMessengerEXT*) noexcept;
-
-void destroy_debug_utils_messenger_EXT(
-    vk::UniqueInstance&,
-    VkDebugUtilsMessengerEXT,
-    const VkAllocationCallbacks*) noexcept;
+auto create_debug_utils_messenger_EXT(vk::UniqueInstance&) noexcept;
 
 bool check_validation_layer_support(const std::vector<const char*>&) noexcept;
 #endif // NDEBUG
@@ -60,8 +51,7 @@ vk::UniqueInstance create_instance(
 GLFWwindow* init_window(std::string_view, int, int) noexcept;
 
 #ifndef NDEBUG
-void
-setup_debug_messenger(vk::UniqueInstance&, VkDebugUtilsMessengerEXT&) noexcept;
+auto setup_debug_messenger(vk::UniqueInstance&) noexcept;
 #endif // NDEBUG
 
 bool is_device_suitable(
@@ -116,7 +106,7 @@ VkExtent2D choose_swap_extent(
     const VkSurfaceCapabilitiesKHR&, int width, int height) noexcept;
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
-    vk::UniqueDevice,
+    vk::UniqueDevice&,
     vk::PhysicalDevice,
     VkSurfaceKHR,
     VkFormat&,
@@ -125,24 +115,24 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
     int) noexcept;
 
 std::vector<VkImageView> create_image_views(
-    vk::UniqueDevice, const std::vector<VkImage>&, VkFormat) noexcept;
+    vk::UniqueDevice&, const std::vector<VkImage>&, VkFormat) noexcept;
 
-VkRenderPass create_render_pass(vk::UniqueDevice, VkFormat) noexcept;
+VkRenderPass create_render_pass(vk::UniqueDevice&, VkFormat) noexcept;
 
-std::tuple<VkPipelineLayout, VkPipeline> create_graphics_pipeline(
-    vk::UniqueDevice, VkExtent2D, VkRenderPass) noexcept;
+std::tuple<VkPipelineLayout, VkPipeline>
+create_graphics_pipeline(vk::UniqueDevice&, VkExtent2D, VkRenderPass) noexcept;
 
 std::vector<VkFramebuffer> create_framebuffers(
-    vk::UniqueDevice,
+    vk::UniqueDevice&,
     VkRenderPass,
     const std::vector<VkImageView>&,
     VkExtent2D) noexcept;
 
 VkCommandPool create_command_pool(
-    vk::UniqueDevice, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
+    vk::UniqueDevice&, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
 
 std::vector<VkCommandBuffer> create_command_buffers(
-    vk::UniqueDevice,
+    vk::UniqueDevice&,
     const std::vector<VkFramebuffer>&,
     VkRenderPass,
     VkExtent2D,
@@ -154,7 +144,7 @@ std::tuple<
     std::vector<VkSemaphore>,
     std::vector<VkFence>,
     std::vector<VkFence>>
-create_sync_objects(vk::UniqueDevice, const std::vector<VkImage>&) noexcept;
+create_sync_objects(vk::UniqueDevice&, const std::vector<VkImage>&) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
 
@@ -163,7 +153,7 @@ create_shader_module(vk::UniqueDevice&, const std::vector<char>&) noexcept;
 
 std::tuple<
 #ifndef NDEBUG
-    vk::DebugUtilsMessengerEXT,
+    vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>,
 #endif // NDEBUG
     vk::UniqueInstance,
     vk::UniqueDevice,
@@ -235,12 +225,7 @@ void cleanup(
     std::vector<VkSemaphore>&,
     std::vector<VkSemaphore>&,
     std::vector<VkFence>&,
-    GLFWwindow*
-#ifndef NDEBUG
-    ,
-    VkDebugUtilsMessengerEXT
-#endif // NDEBUG
-    ) noexcept;
+    GLFWwindow*) noexcept;
 
 std::vector<const char*> get_required_extensions() noexcept;
 
@@ -318,12 +303,7 @@ hello_triangle::run() noexcept
         _image_available_semaphores,
         _render_finished_semaphores,
         _inflight_fences,
-        _window
-#ifndef NDEBUG
-        ,
-        _debug_messenger
-#endif // NDEBUG
-    );
+        _window);
 }
 
 namespace /* anonymous */ {
@@ -347,34 +327,17 @@ populate_debug_messenger_create_info() noexcept
         {}, severity_flags, message_type_flags, debug_callback);
 }
 
-VkResult
-create_debug_utils_messenger_EXT(
-    vk::UniqueInstance&                       instance,
-    const VkDebugUtilsMessengerCreateInfoEXT* create_info,
-    const VkAllocationCallbacks*              allocator,
-    VkDebugUtilsMessengerEXT*                 debug_messenger) noexcept
+auto
+create_debug_utils_messenger_EXT(vk::UniqueInstance& instance) noexcept
 {
     auto dmci = populate_debug_messenger_create_info();
-    auto debugUtilsMessenger =
+    auto [result, debug_utils_messenger] =
         instance->createDebugUtilsMessengerEXTUnique(dmci);
-    auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(*instance, "vkCreateDebugUtilsMessengerEXT"));
-    if (func != nullptr) {
-        return func(*instance, create_info, allocator, debug_messenger);
+    if (result != vk::Result::eSuccess) {
+        ERROR("failed to create debug-utils messenger");
     }
 
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-void
-destroy_debug_utils_messenger_EXT(
-    vk::UniqueInstance&          instance,
-    VkDebugUtilsMessengerEXT     debug_messenger,
-    const VkAllocationCallbacks* allocator) noexcept
-{
-    auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(*instance, "vkDestroyDebugUtilsMessengerEXT"));
-    if (func) { func(*instance, debug_messenger, allocator); }
+    return std::move(debug_utils_messenger);
 }
 
 bool
@@ -443,9 +406,8 @@ create_instance(
 
 #ifndef NDEBUG
 
-    VkDebugUtilsMessengerCreateInfoEXT debug_create_info;
-    populate_debug_messenger_create_info(debug_create_info);
-    create_info.setPNext(&debug_create_info);
+    auto dmci = populate_debug_messenger_create_info();
+    create_info.setPNext(&dmci);
 
 #endif // NDEBUG
 
@@ -481,18 +443,10 @@ init_window(std::string_view caption, int width, int height) noexcept
 }
 
 #ifndef NDEBUG
-void
-setup_debug_messenger(
-    vk::UniqueInstance&         instance,
-    vk::DebugUtilsMessengerEXT& debug_messenger) noexcept
+auto
+setup_debug_messenger(vk::UniqueInstance& instance) noexcept
 {
-    VkDebugUtilsMessengerCreateInfoEXT create_info;
-    populate_debug_messenger_create_info(create_info);
-
-    if (create_debug_utils_messenger_EXT(
-            instance, &create_info, nullptr, &debug_messenger) != VK_SUCCESS) {
-        ERROR("failed to set up debug messenger!");
-    }
+    return create_debug_utils_messenger_EXT(instance);
 }
 #endif // NDEBUG
 
@@ -795,7 +749,7 @@ choose_swap_extent(
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>>
 create_swapchain(
-    vk::UniqueDevice   device,
+    vk::UniqueDevice&  device,
     vk::PhysicalDevice physical_device,
     VkSurfaceKHR       surface,
     VkFormat&          swapchain_image_format,
@@ -902,7 +856,7 @@ create_image_views(
 
 VkRenderPass
 create_render_pass(
-    vk::UniqueDevice device, VkFormat swapchain_image_format) noexcept
+    vk::UniqueDevice& device, VkFormat swapchain_image_format) noexcept
 {
     VkAttachmentDescription color_attachment = {};
     color_attachment.format                  = swapchain_image_format;
@@ -1181,7 +1135,7 @@ create_command_pool(
 
 std::vector<VkCommandBuffer>
 create_command_buffers(
-    vk::UniqueDevice                  device,
+    vk::UniqueDevice&                 device,
     const std::vector<VkFramebuffer>& swapchain_framebuffers,
     VkRenderPass                      render_pass,
     VkExtent2D                        swapchain_extent,
@@ -1322,7 +1276,7 @@ create_shader_module(
 
 std::tuple<
 #ifndef NDEBUG
-    vk::DebugUtilsMessengerEXT,
+    vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>,
 #endif // NDEBUG
     vk::UniqueInstance,
     vk::UniqueDevice,
@@ -1367,7 +1321,7 @@ init_vulkan(
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 #ifndef NDEBUG
-    setup_debug_messenger(instance, debug_messenger);
+    auto debug_messenger = setup_debug_messenger(instance);
 #endif // NDEBUG
 
     VkSurfaceKHR surface = create_surface(instance, window);
@@ -1422,26 +1376,30 @@ init_vulkan(
          inflight_fences,
          images_inflight] = create_sync_objects(device, swapchain_images);
 
-    return std::tuple{std::move(instance),
-                      std::move(device),
-                      std::move(graphics_queue),
-                      std::move(present_queue),
-                      std::move(surface),
-                      std::move(swapchain),
-                      std::move(swapchain_images),
-                      std::move(swapchain_image_format),
-                      std::move(swapchain_extent),
-                      std::move(swapchain_image_views),
-                      std::move(pipeline_layout),
-                      std::move(graphics_pipeline),
-                      std::move(render_pass),
-                      std::move(swapchain_framebuffers),
-                      std::move(command_pool),
-                      std::move(command_buffers),
-                      std::move(image_available_semaphores),
-                      std::move(render_finished_semaphores),
-                      std::move(inflight_fences),
-                      std::move(images_inflight)};
+    return std::tuple{
+#ifndef NDEBUG
+        std::move(debug_messenger),
+#endif // NDEBUG
+        std::move(instance),
+        std::move(device),
+        std::move(graphics_queue),
+        std::move(present_queue),
+        std::move(surface),
+        std::move(swapchain),
+        std::move(swapchain_images),
+        std::move(swapchain_image_format),
+        std::move(swapchain_extent),
+        std::move(swapchain_image_views),
+        std::move(pipeline_layout),
+        std::move(graphics_pipeline),
+        std::move(render_pass),
+        std::move(swapchain_framebuffers),
+        std::move(command_pool),
+        std::move(command_buffers),
+        std::move(image_available_semaphores),
+        std::move(render_finished_semaphores),
+        std::move(inflight_fences),
+        std::move(images_inflight)};
 }
 
 void
@@ -1474,7 +1432,7 @@ main_loop(
             current_frame);
     }
 
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(*device);
 }
 
 void
@@ -1495,7 +1453,7 @@ draw_frame(
 
     uint32_t image_index;
     vkAcquireNextImageKHR(
-        device,
+        *device,
         swapchain,
         UINT64_MAX,
         image_available_semaphores[current_frame],
@@ -1506,7 +1464,7 @@ draw_frame(
     // wait on)
     if (images_inflight[image_index] != VK_NULL_HANDLE) {
         vkWaitForFences(
-            device, 1, &images_inflight[image_index], VK_TRUE, UINT64_MAX);
+            *device, 1, &images_inflight[image_index], VK_TRUE, UINT64_MAX);
     }
     // mark the image as now being in use by this frame
     images_inflight[image_index] = inflight_fences[current_frame];
@@ -1528,7 +1486,7 @@ draw_frame(
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores    = signal_semaphores;
 
-    vkResetFences(device, 1, &inflight_fences[current_frame]);
+    vkResetFences(*device, 1, &inflight_fences[current_frame]);
 
     if (vkQueueSubmit(
             graphics_queue, 1, &submit_info, inflight_fences[current_frame]) !=
@@ -1569,39 +1527,30 @@ cleanup(
     std::vector<VkSemaphore>&   image_available_semaphores,
     std::vector<VkSemaphore>&   render_finished_semaphores,
     std::vector<VkFence>&       inflight_fences,
-    GLFWwindow*                 window
-#ifndef NDEBUG
-    ,
-    VkDebugUtilsMessengerEXT debug_messenger
-#endif // NDEBUG
-    ) noexcept
+    GLFWwindow*                 window) noexcept
 {
-#ifndef NDEBUG
-    destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
-#endif // NDEBUG
-
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
-        vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
-        vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
-        vkDestroyFence(device, inflight_fences[i], nullptr);
+        vkDestroySemaphore(*device, render_finished_semaphores[i], nullptr);
+        vkDestroySemaphore(*device, image_available_semaphores[i], nullptr);
+        vkDestroyFence(*device, inflight_fences[i], nullptr);
     }
 
-    vkDestroyCommandPool(device, command_pool, nullptr);
+    vkDestroyCommandPool(*device, command_pool, nullptr);
 
     for (auto framebuffer : swapchain_framebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
+        vkDestroyFramebuffer(*device, framebuffer, nullptr);
     }
 
-    vkDestroyPipeline(device, graphics_pipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-    vkDestroyRenderPass(device, render_pass, nullptr);
+    vkDestroyPipeline(*device, graphics_pipeline, nullptr);
+    vkDestroyPipelineLayout(*device, pipeline_layout, nullptr);
+    vkDestroyRenderPass(*device, render_pass, nullptr);
 
     for (auto image_view : swapchain_image_views) {
-        vkDestroyImageView(device, image_view, nullptr);
+        vkDestroyImageView(*device, image_view, nullptr);
     }
 
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
-    vkDestroyDevice(device, nullptr);
+    vkDestroySwapchainKHR(*device, swapchain, nullptr);
+    vkDestroyDevice(*device, nullptr);
     vkDestroySurfaceKHR(*instance, surface, nullptr);
     glfwDestroyWindow(window);
     glfwTerminate();
