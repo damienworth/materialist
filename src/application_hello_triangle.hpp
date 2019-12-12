@@ -14,7 +14,7 @@ class hello_triangle {
     const int   _WIDTH  = 800;
     const int   _HEIGHT = 600;
 
-    vk::UniqueInstance           _instance;
+    vk::UniqueInstance _instance;
 
 #ifndef NDEBUG
     vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>
