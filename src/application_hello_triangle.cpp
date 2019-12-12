@@ -65,7 +65,7 @@ vk::PhysicalDevice pick_physical_device(
     VkSurfaceKHR,
     const std::vector<const char*>&) noexcept;
 
-std::tuple<vk::UniqueDevice, VkQueue, VkQueue> create_logical_device(
+std::tuple<vk::UniqueDevice, vk::Queue, VkQueue> create_logical_device(
     vk::PhysicalDevice,
     VkSurfaceKHR,
     const std::vector<const char*>&
@@ -157,8 +157,8 @@ std::tuple<
 #endif // NDEBUG
     vk::UniqueInstance,
     vk::UniqueDevice,
-    VkQueue,
-    VkQueue,
+    vk::Queue,
+    vk::Queue,
     VkSurfaceKHR,
     VkSwapchainKHR,
     std::vector<VkImage>,
@@ -188,8 +188,8 @@ init_vulkan(
 
 void main_loop(
     vk::UniqueDevice&,
-    VkQueue,
-    VkQueue,
+    vk::Queue,
+    vk::Queue,
     VkSwapchainKHR,
     const std::vector<VkCommandBuffer>&,
     const std::vector<VkSemaphore>&,
@@ -201,8 +201,8 @@ void main_loop(
 
 void draw_frame(
     vk::UniqueDevice&,
-    VkQueue,
-    VkQueue,
+    vk::Queue,
+    vk::Queue,
     VkSwapchainKHR,
     const std::vector<VkCommandBuffer>&,
     const std::vector<VkSemaphore>&,
@@ -532,7 +532,7 @@ pick_physical_device(
     return physical_device;
 }
 
-std::tuple<vk::UniqueDevice, VkQueue, VkQueue>
+std::tuple<vk::UniqueDevice, vk::Queue, VkQueue>
 create_logical_device(
     vk::PhysicalDevice              physical_device,
     VkSurfaceKHR                    surface,
@@ -601,12 +601,8 @@ create_logical_device(
         ERROR("failed to create logical device!");
     }
 
-    VkQueue graphics_queue;
-    vkGetDeviceQueue(*device, graphics_queue_family_index, 0, &graphics_queue);
-
-    VkQueue present_queue;
-    vkGetDeviceQueue(*device, present_queue_family_index, 0, &present_queue);
-
+    auto graphics_queue = device->getQueue(graphics_queue_family_index, 0);
+    auto present_queue  = device->getQueue(present_queue_family_index, 0);
     return std::tuple{std::move(device), graphics_queue, present_queue};
 }
 
@@ -1280,8 +1276,8 @@ std::tuple<
 #endif // NDEBUG
     vk::UniqueInstance,
     vk::UniqueDevice,
-    VkQueue,
-    VkQueue,
+    vk::Queue,
+    vk::Queue,
     VkSurfaceKHR,
     VkSwapchainKHR,
     std::vector<VkImage>,
@@ -1405,8 +1401,8 @@ init_vulkan(
 void
 main_loop(
     vk::UniqueDevice&                   device,
-    VkQueue                             graphics_queue,
-    VkQueue                             present_queue,
+    vk::Queue                           graphics_queue,
+    vk::Queue                           present_queue,
     VkSwapchainKHR                      swapchain,
     const std::vector<VkCommandBuffer>& command_buffers,
     const std::vector<VkSemaphore>&     image_available_semaphores,
@@ -1438,8 +1434,8 @@ main_loop(
 void
 draw_frame(
     vk::UniqueDevice&                   device,
-    VkQueue                             graphics_queue,
-    VkQueue                             present_queue,
+    vk::Queue                           graphics_queue,
+    vk::Queue                           present_queue,
     VkSwapchainKHR                      swapchain,
     const std::vector<VkCommandBuffer>& command_buffers,
     const std::vector<VkSemaphore>&     image_available_semaphores,

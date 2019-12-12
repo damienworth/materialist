@@ -22,8 +22,8 @@ class hello_triangle {
 #endif // NDEBUG
 
     vk::UniqueDevice             _device;
-    VkQueue                      _graphics_queue;
-    VkQueue                      _present_queue;
+    vk::Queue                    _graphics_queue;
+    vk::Queue                    _present_queue;
     VkSwapchainKHR               _swapchain;
     std::vector<VkImage>         _swapchain_images;
     VkFormat                     _swapchain_image_format;
