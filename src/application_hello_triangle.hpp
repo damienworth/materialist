@@ -14,12 +14,13 @@ class hello_triangle {
     const int   _WIDTH  = 800;
     const int   _HEIGHT = 600;
 
+    vk::UniqueInstance           _instance;
+
 #ifndef NDEBUG
     vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>
         _debug_messenger;
 #endif // NDEBUG
 
-    vk::UniqueInstance           _instance;
     vk::UniqueDevice             _device;
     VkQueue                      _graphics_queue;
     VkQueue                      _present_queue;

@@ -1550,7 +1550,6 @@ cleanup(
     }
 
     vkDestroySwapchainKHR(*device, swapchain, nullptr);
-    vkDestroyDevice(*device, nullptr);
     vkDestroySurfaceKHR(*instance, surface, nullptr);
     glfwDestroyWindow(window);
     glfwTerminate();
