@@ -10,9 +10,9 @@
 namespace application {
 
 class hello_triangle {
-    GLFWwindow*                  _window = nullptr;
-    const int                    _WIDTH  = 800;
-    const int                    _HEIGHT = 600;
+    GLFWwindow* _window = nullptr;
+    const int   _WIDTH  = 800;
+    const int   _HEIGHT = 600;
 
 #ifndef NDEBUG
     vk::DebugUtilsMessengerEXT _debug_messenger;
