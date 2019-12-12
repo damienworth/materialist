@@ -75,7 +75,7 @@ vk::PhysicalDevice pick_physical_device(
     VkSurfaceKHR,
     const std::vector<const char*>&) noexcept;
 
-std::tuple<VkDevice, VkQueue, VkQueue> create_logical_device(
+std::tuple<vk::UniqueDevice, VkQueue, VkQueue> create_logical_device(
     vk::PhysicalDevice,
     VkSurfaceKHR,
     const std::vector<const char*>&
@@ -116,7 +116,7 @@ VkExtent2D choose_swap_extent(
     const VkSurfaceCapabilitiesKHR&, int width, int height) noexcept;
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
-    VkDevice,
+    vk::UniqueDevice,
     vk::PhysicalDevice,
     VkSurfaceKHR,
     VkFormat&,
@@ -124,25 +124,25 @@ std::tuple<VkSwapchainKHR, std::vector<VkImage>> create_swapchain(
     int,
     int) noexcept;
 
-std::vector<VkImageView>
-create_image_views(VkDevice, const std::vector<VkImage>&, VkFormat) noexcept;
+std::vector<VkImageView> create_image_views(
+    vk::UniqueDevice, const std::vector<VkImage>&, VkFormat) noexcept;
 
-VkRenderPass create_render_pass(VkDevice, VkFormat) noexcept;
+VkRenderPass create_render_pass(vk::UniqueDevice, VkFormat) noexcept;
 
-std::tuple<VkPipelineLayout, VkPipeline>
-    create_graphics_pipeline(VkDevice, VkExtent2D, VkRenderPass) noexcept;
+std::tuple<VkPipelineLayout, VkPipeline> create_graphics_pipeline(
+    vk::UniqueDevice, VkExtent2D, VkRenderPass) noexcept;
 
 std::vector<VkFramebuffer> create_framebuffers(
-    VkDevice,
+    vk::UniqueDevice,
     VkRenderPass,
     const std::vector<VkImageView>&,
     VkExtent2D) noexcept;
 
-VkCommandPool
-    create_command_pool(VkDevice, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
+VkCommandPool create_command_pool(
+    vk::UniqueDevice, vk::PhysicalDevice, VkSurfaceKHR) noexcept;
 
 std::vector<VkCommandBuffer> create_command_buffers(
-    VkDevice,
+    vk::UniqueDevice,
     const std::vector<VkFramebuffer>&,
     VkRenderPass,
     VkExtent2D,
@@ -154,16 +154,19 @@ std::tuple<
     std::vector<VkSemaphore>,
     std::vector<VkFence>,
     std::vector<VkFence>>
-create_sync_objects(VkDevice, const std::vector<VkImage>&) noexcept;
+create_sync_objects(vk::UniqueDevice, const std::vector<VkImage>&) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
 
 VkShaderModule
-create_shader_module(VkDevice, const std::vector<char>&) noexcept;
+create_shader_module(vk::UniqueDevice&, const std::vector<char>&) noexcept;
 
 std::tuple<
+#ifndef NDEBUG
+    vk::DebugUtilsMessengerEXT,
+#endif // NDEBUG
     vk::UniqueInstance,
-    VkDevice,
+    vk::UniqueDevice,
     VkQueue,
     VkQueue,
     VkSurfaceKHR,
@@ -189,13 +192,12 @@ init_vulkan(
     int
 #ifndef NDEBUG
     ,
-    VkDebugUtilsMessengerEXT&,
     const std::vector<const char*>&
 #endif // NDEBUG
     ) noexcept;
 
 void main_loop(
-    VkDevice,
+    vk::UniqueDevice&,
     VkQueue,
     VkQueue,
     VkSwapchainKHR,
@@ -208,7 +210,7 @@ void main_loop(
     GLFWwindow*) noexcept;
 
 void draw_frame(
-    VkDevice,
+    vk::UniqueDevice&,
     VkQueue,
     VkQueue,
     VkSwapchainKHR,
@@ -221,7 +223,7 @@ void draw_frame(
 
 void cleanup(
     vk::UniqueInstance&,
-    VkDevice,
+    vk::UniqueDevice&,
     VkSurfaceKHR,
     VkSwapchainKHR,
     std::vector<VkImageView>&,
@@ -257,6 +259,9 @@ hello_triangle::run() noexcept
 {
     _window = init_window("Vulkan", _WIDTH, _HEIGHT);
     std::tie(
+#ifndef NDEBUG
+        _debug_messenger,
+#endif // NDEBUG
         _instance,
         _device,
         _graphics_queue,
@@ -284,7 +289,6 @@ hello_triangle::run() noexcept
             _HEIGHT
 #ifndef NDEBUG
             ,
-            _debug_messenger,
             _validation_layers
 #endif // NDEBUG
         );
@@ -325,21 +329,22 @@ hello_triangle::run() noexcept
 namespace /* anonymous */ {
 
 #ifndef NDEBUG
-void
-populate_debug_messenger_create_info(
-    VkDebugUtilsMessengerCreateInfoEXT& create_info) noexcept
+vk::DebugUtilsMessengerCreateInfoEXT
+populate_debug_messenger_create_info() noexcept
 {
-    create_info       = {};
-    create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    create_info.messageSeverity =
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-    create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    create_info.pfnUserCallback = debug_callback;
+    vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose);
+
+    vk::DebugUtilsMessageTypeFlagsEXT message_type_flags(
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
+
+    return vk::DebugUtilsMessengerCreateInfoEXT(
+        {}, severity_flags, message_type_flags, debug_callback);
 }
 
 VkResult
@@ -349,6 +354,9 @@ create_debug_utils_messenger_EXT(
     const VkAllocationCallbacks*              allocator,
     VkDebugUtilsMessengerEXT*                 debug_messenger) noexcept
 {
+    auto dmci = populate_debug_messenger_create_info();
+    auto debugUtilsMessenger =
+        instance->createDebugUtilsMessengerEXTUnique(dmci);
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(*instance, "vkCreateDebugUtilsMessengerEXT"));
     if (func != nullptr) {
@@ -475,8 +483,8 @@ init_window(std::string_view caption, int width, int height) noexcept
 #ifndef NDEBUG
 void
 setup_debug_messenger(
-    vk::UniqueInstance&       instance,
-    VkDebugUtilsMessengerEXT& debug_messenger) noexcept
+    vk::UniqueInstance&         instance,
+    vk::DebugUtilsMessengerEXT& debug_messenger) noexcept
 {
     VkDebugUtilsMessengerCreateInfoEXT create_info;
     populate_debug_messenger_create_info(create_info);
@@ -570,7 +578,7 @@ pick_physical_device(
     return physical_device;
 }
 
-std::tuple<VkDevice, VkQueue, VkQueue>
+std::tuple<vk::UniqueDevice, VkQueue, VkQueue>
 create_logical_device(
     vk::PhysicalDevice              physical_device,
     VkSurfaceKHR                    surface,
@@ -581,59 +589,71 @@ create_logical_device(
 #endif // NDEBUG
     ) noexcept
 {
-    queue_family_indices indices =
-        find_queue_families(physical_device, surface);
+    auto queue_family_properties = physical_device.getQueueFamilyProperties();
+    auto graphics_queue_family_index = gsl::narrow<uint32_t>(std::distance(
+        begin(queue_family_properties),
+        std::find_if(
+            begin(queue_family_properties),
+            end(queue_family_properties),
+            [](const auto& qfp) {
+                return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
+            })));
 
-    std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
+    auto [spmresult, present_modes] =
+        physical_device.getSurfacePresentModesKHR(surface);
+    if (spmresult != vk::Result::eSuccess) {
+        ERROR("failed to get surface present modes");
+    }
+
+    auto present_queue_family_index =
+        gsl::narrow<uint32_t>(present_modes.size()) <
+                graphics_queue_family_index ?
+            graphics_queue_family_index :
+            0u;
+
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
     queue_create_infos.reserve(2);
 
-    std::set<uint32_t> unique_queue_families = {*indices.graphics_family,
-                                                *indices.present_family};
+    std::set<uint32_t> unique_queue_families = {graphics_queue_family_index,
+                                                present_queue_family_index};
 
     float queue_priority = 1.0f;
     for (uint32_t queue_family : unique_queue_families) {
-        VkDeviceQueueCreateInfo queue_create_info = {};
-        queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queue_create_info.queueFamilyIndex = queue_family;
-        queue_create_info.queueCount       = 1;
-        queue_create_info.pQueuePriorities = &queue_priority;
+        vk::DeviceQueueCreateInfo queue_create_info(
+            {}, queue_family, 1, &queue_priority);
         queue_create_infos.push_back(queue_create_info);
     }
 
-    VkPhysicalDeviceFeatures device_features = {};
+    vk::PhysicalDeviceFeatures device_features;
 
-    VkDeviceCreateInfo create_info = {};
-    create_info.sType              = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info.queueCreateInfoCount =
-        static_cast<uint32_t>(queue_create_infos.size());
-    create_info.pQueueCreateInfos = queue_create_infos.data();
-    create_info.pEnabledFeatures  = &device_features;
-
-    create_info.enabledExtensionCount =
-        static_cast<uint32_t>(device_extensions.size());
-    create_info.ppEnabledExtensionNames = device_extensions.data();
-
+    vk::DeviceCreateInfo create_info(
+        {},
+        gsl::narrow<uint32_t>(queue_create_infos.size()),
+        queue_create_infos.data(),
 #ifndef NDEBUG
-    create_info.enabledLayerCount =
-        static_cast<uint32_t>(validation_layers.size());
-    create_info.ppEnabledLayerNames = validation_layers.data();
-#else  // NDEBUG
-    create_info.enabledLayerCount = 0;
+        gsl::narrow<uint32_t>(validation_layers.size()),
+        validation_layers.data(),
+#else  // Release
+        0,
+        nullptr,
 #endif // NDEBUG
+        gsl::narrow<uint32_t>(device_extensions.size()),
+        device_extensions.data());
 
-    VkDevice device;
-    if (vkCreateDevice(physical_device, &create_info, nullptr, &device) !=
-        VK_SUCCESS) {
+    create_info.setPEnabledFeatures(&device_features);
+
+    auto [result, device] = physical_device.createDeviceUnique(create_info);
+    if (result != vk::Result::eSuccess) {
         ERROR("failed to create logical device!");
     }
 
     VkQueue graphics_queue;
-    vkGetDeviceQueue(device, *indices.graphics_family, 0, &graphics_queue);
+    vkGetDeviceQueue(*device, graphics_queue_family_index, 0, &graphics_queue);
 
     VkQueue present_queue;
-    vkGetDeviceQueue(device, *indices.present_family, 0, &present_queue);
+    vkGetDeviceQueue(*device, present_queue_family_index, 0, &present_queue);
 
-    return std::tuple{device, graphics_queue, present_queue};
+    return std::tuple{std::move(device), graphics_queue, present_queue};
 }
 
 VkSurfaceKHR
@@ -775,7 +795,7 @@ choose_swap_extent(
 
 std::tuple<VkSwapchainKHR, std::vector<VkImage>>
 create_swapchain(
-    VkDevice           device,
+    vk::UniqueDevice   device,
     vk::PhysicalDevice physical_device,
     VkSurfaceKHR       surface,
     VkFormat&          swapchain_image_format,
@@ -830,16 +850,16 @@ create_swapchain(
     create_info.oldSwapchain   = VK_NULL_HANDLE;
 
     VkSwapchainKHR swapchain;
-    if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain) !=
+    if (vkCreateSwapchainKHR(*device, &create_info, nullptr, &swapchain) !=
         VK_SUCCESS) {
         ERROR("failed to create swap chain!");
     }
 
     std::vector<VkImage> swapchain_images;
-    vkGetSwapchainImagesKHR(device, swapchain, &image_count, nullptr);
+    vkGetSwapchainImagesKHR(*device, swapchain, &image_count, nullptr);
     swapchain_images.resize(image_count);
     vkGetSwapchainImagesKHR(
-        device, swapchain, &image_count, swapchain_images.data());
+        *device, swapchain, &image_count, swapchain_images.data());
     swapchain_image_format = surface_format.format;
     swapchain_extent       = extent;
 
@@ -848,7 +868,7 @@ create_swapchain(
 
 std::vector<VkImageView>
 create_image_views(
-    VkDevice                    device,
+    vk::UniqueDevice&           device,
     const std::vector<VkImage>& swapchain_images,
     VkFormat                    swapchain_image_format) noexcept
 {
@@ -871,7 +891,7 @@ create_image_views(
         create_info.subresourceRange.layerCount     = 1;
 
         if (vkCreateImageView(
-                device, &create_info, nullptr, &swapchain_image_views[i]) !=
+                *device, &create_info, nullptr, &swapchain_image_views[i]) !=
             VK_SUCCESS) {
             ERROR("failed to create image views");
         }
@@ -881,7 +901,8 @@ create_image_views(
 }
 
 VkRenderPass
-create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
+create_render_pass(
+    vk::UniqueDevice device, VkFormat swapchain_image_format) noexcept
 {
     VkAttachmentDescription color_attachment = {};
     color_attachment.format                  = swapchain_image_format;
@@ -921,7 +942,7 @@ create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
     render_pass_info.pDependencies   = &dependency;
 
     VkRenderPass render_pass;
-    if (vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass) !=
+    if (vkCreateRenderPass(*device, &render_pass_info, nullptr, &render_pass) !=
         VK_SUCCESS) {
         ERROR("failed to create render pass");
     }
@@ -931,9 +952,9 @@ create_render_pass(VkDevice device, VkFormat swapchain_image_format) noexcept
 
 std::tuple<VkPipelineLayout, VkPipeline>
 create_graphics_pipeline(
-    VkDevice     device,
-    VkExtent2D   swapchain_extent,
-    VkRenderPass render_pass) noexcept
+    vk::UniqueDevice& device,
+    VkExtent2D        swapchain_extent,
+    VkRenderPass      render_pass) noexcept
 {
     auto vert_shader_code = read_file("shaders/shader.vert.spv");
     auto frag_shader_code = read_file("shaders/shader.frag.spv");
@@ -1059,7 +1080,7 @@ create_graphics_pipeline(
     pipeline_layout_info.pPushConstantRanges    = nullptr;
 
     if (vkCreatePipelineLayout(
-            device, &pipeline_layout_info, nullptr, &pipeline_layout) !=
+            *device, &pipeline_layout_info, nullptr, &pipeline_layout) !=
         VK_SUCCESS) {
         ERROR("failed to create pipeline layout");
     }
@@ -1087,7 +1108,7 @@ create_graphics_pipeline(
 
     VkPipeline graphics_pipeline;
     if (vkCreateGraphicsPipelines(
-            device,
+            *device,
             VK_NULL_HANDLE,
             1,
             &pipeline_info,
@@ -1096,15 +1117,15 @@ create_graphics_pipeline(
         ERROR("failed to create graphics pipeline");
     }
 
-    vkDestroyShaderModule(device, frag_shader_module, nullptr);
-    vkDestroyShaderModule(device, vert_shader_module, nullptr);
+    vkDestroyShaderModule(*device, frag_shader_module, nullptr);
+    vkDestroyShaderModule(*device, vert_shader_module, nullptr);
 
     return {pipeline_layout, graphics_pipeline};
 }
 
 std::vector<VkFramebuffer>
 create_framebuffers(
-    VkDevice                        device,
+    vk::UniqueDevice&               device,
     VkRenderPass                    render_pass,
     const std::vector<VkImageView>& swapchain_image_views,
     VkExtent2D                      swapchain_extent) noexcept
@@ -1125,7 +1146,7 @@ create_framebuffers(
         framebuffer_info.layers          = 1;
 
         if (vkCreateFramebuffer(
-                device,
+                *device,
                 &framebuffer_info,
                 nullptr,
                 &swapchain_framebuffers[i]) != VK_SUCCESS) {
@@ -1138,7 +1159,7 @@ create_framebuffers(
 
 VkCommandPool
 create_command_pool(
-    VkDevice           device,
+    vk::UniqueDevice&  device,
     vk::PhysicalDevice physical_device,
     VkSurfaceKHR       surface) noexcept
 {
@@ -1150,7 +1171,7 @@ create_command_pool(
     pool_info.flags            = 0;
 
     VkCommandPool command_pool;
-    if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) !=
+    if (vkCreateCommandPool(*device, &pool_info, nullptr, &command_pool) !=
         VK_SUCCESS) {
         ERROR("failed to create command pool");
     }
@@ -1160,7 +1181,7 @@ create_command_pool(
 
 std::vector<VkCommandBuffer>
 create_command_buffers(
-    VkDevice                          device,
+    vk::UniqueDevice                  device,
     const std::vector<VkFramebuffer>& swapchain_framebuffers,
     VkRenderPass                      render_pass,
     VkExtent2D                        swapchain_extent,
@@ -1177,8 +1198,8 @@ create_command_buffers(
     alloc_info.commandBufferCount =
         static_cast<uint32_t>(command_buffers.size());
 
-    if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data()) !=
-        VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(
+            *device, &alloc_info, command_buffers.data()) != VK_SUCCESS) {
         ERROR("failed to allocate command buffers");
     }
 
@@ -1227,7 +1248,8 @@ std::tuple<
     std::vector<VkFence>,
     std::vector<VkFence>>
 create_sync_objects(
-    VkDevice device, const std::vector<VkImage>& swapchain_images) noexcept
+    vk::UniqueDevice&           device,
+    const std::vector<VkImage>& swapchain_images) noexcept
 {
     VkSemaphoreCreateInfo semaphore_info = {};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1244,16 +1266,16 @@ create_sync_objects(
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         if (vkCreateSemaphore(
-                device,
+                *device,
                 &semaphore_info,
                 nullptr,
                 &image_available_semaphores[i]) != VK_SUCCESS ||
             vkCreateSemaphore(
-                device,
+                *device,
                 &semaphore_info,
                 nullptr,
                 &render_finished_semaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(device, &fence_info, nullptr, &inflight_fences[i]) !=
+            vkCreateFence(*device, &fence_info, nullptr, &inflight_fences[i]) !=
                 VK_SUCCESS) {
             ERROR("failed to create synchronization objects for a frame");
         }
@@ -1281,7 +1303,8 @@ read_file(std::string_view filename) noexcept
 }
 
 VkShaderModule
-create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
+create_shader_module(
+    vk::UniqueDevice& device, const std::vector<char>& code) noexcept
 {
     VkShaderModuleCreateInfo create_info = {};
     create_info.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1289,7 +1312,7 @@ create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
     create_info.pCode    = reinterpret_cast<const uint32_t*>(code.data());
 
     VkShaderModule shader_module;
-    if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) !=
+    if (vkCreateShaderModule(*device, &create_info, nullptr, &shader_module) !=
         VK_SUCCESS) {
         ERROR("failed to create shader module");
     }
@@ -1298,8 +1321,11 @@ create_shader_module(VkDevice device, const std::vector<char>& code) noexcept
 }
 
 std::tuple<
+#ifndef NDEBUG
+    vk::DebugUtilsMessengerEXT,
+#endif // NDEBUG
     vk::UniqueInstance,
-    VkDevice,
+    vk::UniqueDevice,
     VkQueue,
     VkQueue,
     VkSurfaceKHR,
@@ -1325,7 +1351,6 @@ init_vulkan(
     int                             height
 #ifndef NDEBUG
     ,
-    VkDebugUtilsMessengerEXT&       debug_messenger,
     const std::vector<const char*>& validation_layers
 #endif // NDEBUG
     ) noexcept
@@ -1421,7 +1446,7 @@ init_vulkan(
 
 void
 main_loop(
-    VkDevice                            device,
+    vk::UniqueDevice&                   device,
     VkQueue                             graphics_queue,
     VkQueue                             present_queue,
     VkSwapchainKHR                      swapchain,
@@ -1454,7 +1479,7 @@ main_loop(
 
 void
 draw_frame(
-    VkDevice                            device,
+    vk::UniqueDevice&                   device,
     VkQueue                             graphics_queue,
     VkQueue                             present_queue,
     VkSwapchainKHR                      swapchain,
@@ -1466,7 +1491,7 @@ draw_frame(
     size_t&                             current_frame) noexcept
 {
     vkWaitForFences(
-        device, 1, &inflight_fences[current_frame], VK_TRUE, UINT64_MAX);
+        *device, 1, &inflight_fences[current_frame], VK_TRUE, UINT64_MAX);
 
     uint32_t image_index;
     vkAcquireNextImageKHR(
@@ -1532,7 +1557,7 @@ draw_frame(
 void
 cleanup(
     vk::UniqueInstance&         instance,
-    VkDevice                    device,
+    vk::UniqueDevice&           device,
     VkSurfaceKHR                surface,
     VkSwapchainKHR              swapchain,
     std::vector<VkImageView>&   swapchain_image_views,
