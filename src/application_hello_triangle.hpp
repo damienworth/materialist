@@ -3,16 +3,14 @@
 
 #include <vector>
 
-#include <GLFW/glfw3.h>
-
 #include <vulkan/vulkan.hpp>
+
+#include "glfwwindow.hpp"
 
 namespace application {
 
 class hello_triangle {
-    GLFWwindow* _window = nullptr;
-    const int   _WIDTH  = 800;
-    const int   _HEIGHT = 600;
+    glfw::window _window;
 
     vk::UniqueInstance _instance;
 
@@ -26,7 +24,7 @@ class hello_triangle {
     vk::Queue                    _present_queue;
     vk::UniqueSurfaceKHR         _surface;
     vk::UniqueSwapchainKHR       _swapchain;
-    std::vector<vk::UniqueImage> _swapchain_images;
+    std::vector<vk::Image>       _swapchain_images;
     vk::Format                   _swapchain_image_format;
     vk::Extent2D                 _swapchain_extent;
     std::vector<VkImageView>     _swapchain_image_views;

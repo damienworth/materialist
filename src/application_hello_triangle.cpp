@@ -48,8 +48,6 @@ vk::UniqueInstance create_instance(
 #endif // NDEBUG
     ) noexcept;
 
-GLFWwindow* init_window(std::string_view, int, int) noexcept;
-
 #ifndef NDEBUG
 auto setup_debug_messenger(vk::UniqueInstance&) noexcept;
 #endif // NDEBUG
@@ -111,7 +109,7 @@ vk::Extent2D choose_swap_extent(
 
 std::tuple<
     vk::UniqueSwapchainKHR,
-    std::vector<vk::UniqueImage>,
+    std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D>
 create_swapchain(
@@ -122,9 +120,7 @@ create_swapchain(
     int) noexcept;
 
 std::vector<VkImageView> create_image_views(
-    vk::UniqueDevice&,
-    const std::vector<vk::UniqueImage>&,
-    vk::Format) noexcept;
+    vk::UniqueDevice&, const std::vector<vk::Image>&, vk::Format) noexcept;
 
 VkRenderPass create_render_pass(vk::UniqueDevice&, VkFormat) noexcept;
 
@@ -153,8 +149,7 @@ std::tuple<
     std::vector<VkSemaphore>,
     std::vector<VkFence>,
     std::vector<VkFence>>
-create_sync_objects(
-    vk::UniqueDevice&, const std::vector<vk::UniqueImage>&) noexcept;
+create_sync_objects(vk::UniqueDevice&, const std::vector<vk::Image>&) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
 
@@ -171,7 +166,7 @@ std::tuple<
     vk::Queue,
     vk::UniqueSurfaceKHR,
     vk::UniqueSwapchainKHR,
-    std::vector<vk::UniqueImage>,
+    std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D,
     std::vector<VkImageView>,
@@ -231,8 +226,7 @@ void cleanup(
     VkCommandPool,
     std::vector<VkSemaphore>&,
     std::vector<VkSemaphore>&,
-    std::vector<VkFence>&,
-    GLFWwindow*) noexcept;
+    std::vector<VkFence>&) noexcept;
 
 std::vector<const char*> get_required_extensions() noexcept;
 
@@ -249,7 +243,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 void
 hello_triangle::run() noexcept
 {
-    _window = init_window("Vulkan", _WIDTH, _HEIGHT);
+    if (!_window.create("Materialist", 800, 600)) {
+        ERROR("failed to create window");
+    }
+
+    if (!*_window) { ERROR("failed to create window"); }
     std::tie(
 #ifndef NDEBUG
         _debug_messenger,
@@ -275,12 +273,12 @@ hello_triangle::run() noexcept
         _inflight_fences,
         _images_inflight) =
         init_vulkan(
-            _window,
+            *_window,
             {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
-            _WIDTH,
-            _HEIGHT
+            _window.w(),
+            _window.h()
 #ifndef NDEBUG
-            ,
+                ,
             _validation_layers
 #endif // NDEBUG
         );
@@ -295,7 +293,7 @@ hello_triangle::run() noexcept
         _inflight_fences,
         _images_inflight,
         _current_frame,
-        _window);
+        *_window);
     cleanup(
         _device,
         _swapchain_image_views,
@@ -306,8 +304,7 @@ hello_triangle::run() noexcept
         _command_pool,
         _image_available_semaphores,
         _render_finished_semaphores,
-        _inflight_fences,
-        _window);
+        _inflight_fences);
 }
 
 namespace /* anonymous */ {
@@ -435,15 +432,6 @@ create_instance(
 #endif // NDEBUG
 
     return std::move(instance);
-}
-
-GLFWwindow*
-init_window(std::string_view caption, int width, int height) noexcept
-{
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    return glfwCreateWindow(width, height, caption.data(), nullptr, nullptr);
 }
 
 #ifndef NDEBUG
@@ -744,7 +732,7 @@ choose_swap_extent(
 
 std::tuple<
     vk::UniqueSwapchainKHR,
-    std::vector<vk::UniqueImage>,
+    std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D>
 create_swapchain(
@@ -813,31 +801,24 @@ create_swapchain(
         ERROR("failed to get swapchain images");
     }
 
-    std::vector<vk::UniqueImage> unique_images(swapchain_images.size());
-    std::transform(
-        begin(swapchain_images),
-        end(swapchain_images),
-        begin(unique_images),
-        [](auto image) { return vk::UniqueImage(image); });
-
     return {std::move(swapchain),
-            std::move(unique_images),
+            std::move(swapchain_images),
             surface_format.format,
             extent};
 }
 
 std::vector<VkImageView>
 create_image_views(
-    vk::UniqueDevice&                   device,
-    const std::vector<vk::UniqueImage>& swapchain_images,
-    vk::Format                          swapchain_image_format) noexcept
+    vk::UniqueDevice&             device,
+    const std::vector<vk::Image>& swapchain_images,
+    vk::Format                    swapchain_image_format) noexcept
 {
     std::vector<VkImageView> swapchain_image_views;
     swapchain_image_views.resize(swapchain_images.size());
     for (size_t i = 0; i < swapchain_images.size(); ++i) {
         VkImageViewCreateInfo create_info = {};
         create_info.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        create_info.image    = *swapchain_images[i];
+        create_info.image    = swapchain_images[i];
         create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
         create_info.format   = static_cast<VkFormat>(swapchain_image_format);
         create_info.components.r                = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1208,8 +1189,8 @@ std::tuple<
     std::vector<VkFence>,
     std::vector<VkFence>>
 create_sync_objects(
-    vk::UniqueDevice&                   device,
-    const std::vector<vk::UniqueImage>& swapchain_images) noexcept
+    vk::UniqueDevice&             device,
+    const std::vector<vk::Image>& swapchain_images) noexcept
 {
     VkSemaphoreCreateInfo semaphore_info = {};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1290,7 +1271,7 @@ std::tuple<
     vk::Queue,
     vk::UniqueSurfaceKHR,
     vk::UniqueSwapchainKHR,
-    std::vector<vk::UniqueImage>,
+    std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D,
     std::vector<VkImageView>,
@@ -1525,8 +1506,7 @@ cleanup(
     VkCommandPool               command_pool,
     std::vector<VkSemaphore>&   image_available_semaphores,
     std::vector<VkSemaphore>&   render_finished_semaphores,
-    std::vector<VkFence>&       inflight_fences,
-    GLFWwindow*                 window) noexcept
+    std::vector<VkFence>&       inflight_fences) noexcept
 {
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(*device, render_finished_semaphores[i], nullptr);
@@ -1547,9 +1527,6 @@ cleanup(
     for (auto image_view : swapchain_image_views) {
         vkDestroyImageView(*device, image_view, nullptr);
     }
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
 }
 
 std::vector<const char*>
