@@ -26,9 +26,9 @@ class hello_triangle {
     vk::Queue                    _present_queue;
     vk::UniqueSurfaceKHR         _surface;
     vk::UniqueSwapchainKHR       _swapchain;
-    std::vector<VkImage>         _swapchain_images;
-    VkFormat                     _swapchain_image_format;
-    VkExtent2D                   _swapchain_extent;
+    std::vector<vk::UniqueImage> _swapchain_images;
+    vk::Format                   _swapchain_image_format;
+    vk::Extent2D                 _swapchain_extent;
     std::vector<VkImageView>     _swapchain_image_views;
     VkRenderPass                 _render_pass;
     VkPipelineLayout             _pipeline_layout;
