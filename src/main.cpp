@@ -2,6 +2,10 @@
 
 #include "spdlog_all.hpp"
 
+#include <vulkan/vulkan.hpp>
+
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
 #include "application_hello_triangle.hpp"
 
 int

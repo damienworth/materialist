@@ -74,6 +74,8 @@ endif (UNIX AND NOT APPLE)
 
 target_link_libraries(materialist
 PRIVATE
+    ubsan
+    asan
     fmt::fmt
     spdlog::spdlog_header_only
     glm_static

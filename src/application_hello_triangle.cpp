@@ -25,8 +25,6 @@ using spdlog::warn;
     spdlog::error(__VA_ARGS__); \
     std::terminate();
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
 namespace application {
 
 namespace /* anonymous */ {
@@ -119,27 +117,32 @@ create_swapchain(
     int,
     int) noexcept;
 
-std::vector<VkImageView> create_image_views(
-    vk::UniqueDevice&, const std::vector<vk::Image>&, vk::Format) noexcept;
-
-VkRenderPass create_render_pass(vk::UniqueDevice&, VkFormat) noexcept;
-
-std::tuple<VkPipelineLayout, VkPipeline>
-create_graphics_pipeline(vk::UniqueDevice&, VkExtent2D, VkRenderPass) noexcept;
-
-std::vector<VkFramebuffer> create_framebuffers(
+std::vector<vk::UniqueImageView> create_image_views(
     vk::UniqueDevice&,
-    VkRenderPass,
-    const std::vector<VkImageView>&,
-    VkExtent2D) noexcept;
+    const std::vector<vk::Image>&,
+    const vk::Format&) noexcept;
+
+vk::UniqueRenderPass
+create_render_pass(vk::UniqueDevice&, const vk::Format&) noexcept;
+
+std::tuple<VkPipelineLayout, VkPipeline> create_graphics_pipeline(
+    vk::UniqueDevice&,
+    const vk::Extent2D&,
+    const vk::UniqueRenderPass&) noexcept;
+
+std::vector<vk::UniqueFramebuffer> create_framebuffers(
+    vk::UniqueDevice&,
+    const vk::UniqueRenderPass&,
+    const std::vector<vk::UniqueImageView>&,
+    const vk::Extent2D&) noexcept;
 
 VkCommandPool create_command_pool(
     vk::UniqueDevice&, vk::PhysicalDevice, vk::UniqueSurfaceKHR&) noexcept;
 
 std::vector<VkCommandBuffer> create_command_buffers(
     vk::UniqueDevice&,
-    const std::vector<VkFramebuffer>&,
-    VkRenderPass,
+    const std::vector<vk::UniqueFramebuffer>&,
+    vk::RenderPass,
     VkExtent2D,
     VkPipeline,
     VkCommandPool) noexcept;
@@ -158,7 +161,7 @@ create_shader_module(vk::UniqueDevice&, const std::vector<char>&) noexcept;
 
 std::tuple<
 #ifndef NDEBUG
-    vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>,
+    vk::UniqueDebugUtilsMessengerEXT,
 #endif // NDEBUG
     vk::UniqueInstance,
     vk::UniqueDevice,
@@ -169,11 +172,11 @@ std::tuple<
     std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D,
-    std::vector<VkImageView>,
+    std::vector<vk::UniqueImageView>,
     VkPipelineLayout,
     VkPipeline,
-    VkRenderPass,
-    std::vector<VkFramebuffer>,
+    vk::UniqueRenderPass,
+    std::vector<vk::UniqueFramebuffer>,
     VkCommandPool,
     std::vector<VkCommandBuffer>,
     std::vector<VkSemaphore>,
@@ -217,12 +220,9 @@ void draw_frame(
     size_t&) noexcept;
 
 void cleanup(
-    vk::UniqueDevice&,
-    std::vector<VkImageView>&,
+    const vk::UniqueDevice&,
     VkPipelineLayout,
     VkPipeline,
-    VkRenderPass,
-    std::vector<VkFramebuffer>&,
     VkCommandPool,
     std::vector<VkSemaphore>&,
     std::vector<VkSemaphore>&,
@@ -258,14 +258,14 @@ hello_triangle::run() noexcept
         _present_queue,
         _surface,
         _swapchain,
-        _swapchain_images,
-        _swapchain_image_format,
-        _swapchain_extent,
-        _swapchain_image_views,
+        _images,
+        _image_format,
+        _extent,
+        _image_views,
         _pipeline_layout,
         _graphics_pipeline,
         _render_pass,
-        _swapchain_framebuffers,
+        _framebuffers,
         _command_pool,
         _command_buffers,
         _image_available_semaphores,
@@ -296,11 +296,8 @@ hello_triangle::run() noexcept
         *_window);
     cleanup(
         _device,
-        _swapchain_image_views,
         _pipeline_layout,
         _graphics_pipeline,
-        _render_pass,
-        _swapchain_framebuffers,
         _command_pool,
         _image_available_semaphores,
         _render_finished_semaphores,
@@ -795,107 +792,99 @@ create_swapchain(
     if (csresult != vk::Result::eSuccess) {
         ERROR("failed to create swapchain");
     }
-    auto [gsiresult, swapchain_images] =
-        device->getSwapchainImagesKHR(*swapchain);
+    auto [gsiresult, images] = device->getSwapchainImagesKHR(*swapchain);
     if (gsiresult != vk::Result::eSuccess) {
         ERROR("failed to get swapchain images");
     }
 
-    return {std::move(swapchain),
-            std::move(swapchain_images),
-            surface_format.format,
-            extent};
+    return {
+        std::move(swapchain), std::move(images), surface_format.format, extent};
 }
 
-std::vector<VkImageView>
+std::vector<vk::UniqueImageView>
 create_image_views(
     vk::UniqueDevice&             device,
-    const std::vector<vk::Image>& swapchain_images,
-    vk::Format                    swapchain_image_format) noexcept
+    const std::vector<vk::Image>& images,
+    const vk::Format&             image_format) noexcept
 {
-    std::vector<VkImageView> swapchain_image_views;
-    swapchain_image_views.resize(swapchain_images.size());
-    for (size_t i = 0; i < swapchain_images.size(); ++i) {
-        VkImageViewCreateInfo create_info = {};
-        create_info.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        create_info.image    = swapchain_images[i];
-        create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create_info.format   = static_cast<VkFormat>(swapchain_image_format);
-        create_info.components.r                = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.g                = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.b                = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.a                = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        create_info.subresourceRange.baseMipLevel   = 0;
-        create_info.subresourceRange.levelCount     = 1;
-        create_info.subresourceRange.baseArrayLayer = 0;
-        create_info.subresourceRange.layerCount     = 1;
+    std::vector<vk::UniqueImageView> image_views;
+    image_views.reserve(images.size());
+    vk::ComponentMapping component_mapping(
+        vk::ComponentSwizzle::eIdentity,
+        vk::ComponentSwizzle::eIdentity,
+        vk::ComponentSwizzle::eIdentity,
+        vk::ComponentSwizzle::eIdentity);
+    vk::ImageSubresourceRange subresource_range(
+        vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+    for (auto image : images) {
+        vk::ImageViewCreateInfo ivci(
+            {},
+            image,
+            vk::ImageViewType::e2D,
+            image_format,
+            component_mapping,
+            subresource_range);
 
-        if (vkCreateImageView(
-                *device, &create_info, nullptr, &swapchain_image_views[i]) !=
-            VK_SUCCESS) {
-            ERROR("failed to create image views");
+        auto [result, view] = device->createImageView(ivci);
+        if (result != vk::Result::eSuccess) {
+            ERROR("failed to create image view");
         }
+        // debug("unique image view after creation {}", view.get());
+        image_views.emplace_back(std::move(view));
+        // debug("unique image view after emplace {}",
+        // image_views.back().get());
     }
 
-    return swapchain_image_views;
+    return image_views;
 }
 
-VkRenderPass
+vk::UniqueRenderPass
 create_render_pass(
-    vk::UniqueDevice& device, VkFormat swapchain_image_format) noexcept
+    vk::UniqueDevice& device, const vk::Format& image_format) noexcept
 {
-    VkAttachmentDescription color_attachment = {};
-    color_attachment.format                  = swapchain_image_format;
-    color_attachment.samples                 = VK_SAMPLE_COUNT_1_BIT;
-    color_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    color_attachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout             = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    vk::AttachmentDescription attachment_desc(
+        {},
+        image_format,
+        vk::SampleCountFlagBits::e1,
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eStore,
+        vk::AttachmentLoadOp::eDontCare,
+        vk::AttachmentStoreOp::eDontCare,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::ePresentSrcKHR);
 
-    VkAttachmentReference color_attachment_ref = {};
-    color_attachment_ref.attachment            = 0;
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    vk::AttachmentReference color_ref(
+        0, vk::ImageLayout::eColorAttachmentOptimal);
 
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments    = &color_attachment_ref;
+    vk::SubpassDescription subpass(
+        {}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &color_ref);
 
-    VkSubpassDependency dependency = {};
-    dependency.srcSubpass          = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass          = 0;
-    dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    vk::SubpassDependency dependency(
+        uint32_t(VK_SUBPASS_EXTERNAL),
+        uint32_t(0u),
+        vk::PipelineStageFlagBits::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits::eColorAttachmentOutput,
+        vk::AccessFlagBits(),
+        vk::AccessFlagBits::eColorAttachmentRead |
+            vk::AccessFlagBits::eColorAttachmentWrite);
 
-    VkRenderPassCreateInfo render_pass_info = {};
-    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 1;
-    render_pass_info.pAttachments    = &color_attachment;
-    render_pass_info.subpassCount    = 1;
-    render_pass_info.pSubpasses      = &subpass;
-    render_pass_info.dependencyCount = 1;
-    render_pass_info.pDependencies   = &dependency;
+    vk::RenderPassCreateInfo rpci(
+        {}, 1, &attachment_desc, 1, &subpass, 1, &dependency);
 
-    VkRenderPass render_pass;
-    if (vkCreateRenderPass(*device, &render_pass_info, nullptr, &render_pass) !=
-        VK_SUCCESS) {
+    auto [result, render_pass] = device->createRenderPassUnique(rpci);
+    if (result != vk::Result::eSuccess) {
         ERROR("failed to create render pass");
     }
+    debug("render pass after creation {}", render_pass.get());
 
-    return render_pass;
+    return std::move(render_pass);
 }
 
 std::tuple<VkPipelineLayout, VkPipeline>
 create_graphics_pipeline(
-    vk::UniqueDevice& device,
-    VkExtent2D        swapchain_extent,
-    VkRenderPass      render_pass) noexcept
+    vk::UniqueDevice&           device,
+    const vk::Extent2D&         extent,
+    const vk::UniqueRenderPass& render_pass) noexcept
 {
     auto vert_shader_code = read_file("shaders/shader.vert.spv");
     auto frag_shader_code = read_file("shaders/shader.frag.spv");
@@ -936,14 +925,14 @@ create_graphics_pipeline(
     VkViewport viewport = {};
     viewport.x          = 0.f;
     viewport.y          = 0.f;
-    viewport.width      = static_cast<float>(swapchain_extent.width);
-    viewport.height     = static_cast<float>(swapchain_extent.height);
+    viewport.width      = static_cast<float>(extent.width);
+    viewport.height     = static_cast<float>(extent.height);
     viewport.minDepth   = 0.f;
     viewport.maxDepth   = 1.f;
 
     VkRect2D scissor = {};
     scissor.offset   = {0, 0};
-    scissor.extent   = swapchain_extent;
+    scissor.extent   = extent;
 
     VkPipelineViewportStateCreateInfo viewport_state = {};
     viewport_state.sType =
@@ -1042,7 +1031,7 @@ create_graphics_pipeline(
     pipeline_info.pColorBlendState    = &color_blending;
     pipeline_info.pDynamicState       = nullptr;
     pipeline_info.layout              = pipeline_layout;
-    pipeline_info.renderPass          = render_pass;
+    pipeline_info.renderPass          = *render_pass;
     pipeline_info.subpass             = 0;
     pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex   = -1;
@@ -1064,38 +1053,36 @@ create_graphics_pipeline(
     return {pipeline_layout, graphics_pipeline};
 }
 
-std::vector<VkFramebuffer>
+std::vector<vk::UniqueFramebuffer>
 create_framebuffers(
-    vk::UniqueDevice&               device,
-    VkRenderPass                    render_pass,
-    const std::vector<VkImageView>& swapchain_image_views,
-    VkExtent2D                      swapchain_extent) noexcept
+    vk::UniqueDevice&                       device,
+    const vk::UniqueRenderPass&             render_pass,
+    const std::vector<vk::UniqueImageView>& image_views,
+    const vk::Extent2D&                     extent) noexcept
 {
-    std::vector<VkFramebuffer> swapchain_framebuffers;
-    swapchain_framebuffers.resize(swapchain_image_views.size());
+    std::vector<vk::UniqueFramebuffer> framebuffers;
+    framebuffers.reserve(image_views.size());
 
-    for (size_t i = 0; i != swapchain_image_views.size(); ++i) {
-        VkImageView attachments[] = {swapchain_image_views[i]};
+    for (auto const& view : image_views) {
+        debug("view is {}", *view);
+        auto                      attachments = std::array{*view};
+        vk::FramebufferCreateInfo fci(
+            {},
+            *render_pass,
+            1,
+            &attachments[0],
+            extent.width,
+            extent.height,
+            1);
 
-        VkFramebufferCreateInfo framebuffer_info = {};
-        framebuffer_info.sType      = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebuffer_info.renderPass = render_pass;
-        framebuffer_info.attachmentCount = 1;
-        framebuffer_info.pAttachments    = attachments;
-        framebuffer_info.width           = swapchain_extent.width;
-        framebuffer_info.height          = swapchain_extent.height;
-        framebuffer_info.layers          = 1;
-
-        if (vkCreateFramebuffer(
-                *device,
-                &framebuffer_info,
-                nullptr,
-                &swapchain_framebuffers[i]) != VK_SUCCESS) {
+        auto [result, framebuffer] = device->createFramebufferUnique(fci);
+        if (result != vk::Result::eSuccess) {
             ERROR("failed to create framebuffer");
         }
+        framebuffers.push_back(std::move(framebuffer));
     }
 
-    return swapchain_framebuffers;
+    return std::move(framebuffers);
 }
 
 VkCommandPool
@@ -1122,15 +1109,15 @@ create_command_pool(
 
 std::vector<VkCommandBuffer>
 create_command_buffers(
-    vk::UniqueDevice&                 device,
-    const std::vector<VkFramebuffer>& swapchain_framebuffers,
-    VkRenderPass                      render_pass,
-    VkExtent2D                        swapchain_extent,
-    VkPipeline                        graphics_pipeline,
-    VkCommandPool                     command_pool) noexcept
+    vk::UniqueDevice&                         device,
+    const std::vector<vk::UniqueFramebuffer>& framebuffers,
+    vk::RenderPass                            render_pass,
+    VkExtent2D                                extent,
+    VkPipeline                                graphics_pipeline,
+    VkCommandPool                             command_pool) noexcept
 {
     std::vector<VkCommandBuffer> command_buffers;
-    command_buffers.resize(swapchain_framebuffers.size());
+    command_buffers.resize(framebuffers.size());
 
     VkCommandBufferAllocateInfo alloc_info = {};
     alloc_info.sType       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1158,9 +1145,9 @@ create_command_buffers(
         VkRenderPassBeginInfo render_pass_info = {};
         render_pass_info.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         render_pass_info.renderPass  = render_pass;
-        render_pass_info.framebuffer = swapchain_framebuffers[i];
+        render_pass_info.framebuffer = *framebuffers[i];
         render_pass_info.renderArea.offset = {0, 0};
-        render_pass_info.renderArea.extent = swapchain_extent;
+        render_pass_info.renderArea.extent = extent;
 
         VkClearValue clear_color         = {0.f, 0.f, 0.f, 1.f};
         render_pass_info.clearValueCount = 1;
@@ -1189,8 +1176,7 @@ std::tuple<
     std::vector<VkFence>,
     std::vector<VkFence>>
 create_sync_objects(
-    vk::UniqueDevice&             device,
-    const std::vector<vk::Image>& swapchain_images) noexcept
+    vk::UniqueDevice& device, const std::vector<vk::Image>& images) noexcept
 {
     VkSemaphoreCreateInfo semaphore_info = {};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1202,8 +1188,7 @@ create_sync_objects(
     std::vector<VkSemaphore> image_available_semaphores(MAX_FRAMES_IN_FLIGHT);
     std::vector<VkSemaphore> render_finished_semaphores(MAX_FRAMES_IN_FLIGHT);
     std::vector<VkFence>     inflight_fences(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkFence>     images_inflight(
-        swapchain_images.size(), VK_NULL_HANDLE);
+    std::vector<VkFence>     images_inflight(images.size(), VK_NULL_HANDLE);
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         if (vkCreateSemaphore(
@@ -1274,11 +1259,11 @@ std::tuple<
     std::vector<vk::Image>,
     vk::Format,
     vk::Extent2D,
-    std::vector<VkImageView>,
+    std::vector<vk::UniqueImageView>,
     VkPipelineLayout,
     VkPipeline,
-    VkRenderPass,
-    std::vector<VkFramebuffer>,
+    vk::UniqueRenderPass,
+    std::vector<vk::UniqueFramebuffer>,
     VkCommandPool,
     std::vector<VkCommandBuffer>,
     std::vector<VkSemaphore>,
@@ -1324,32 +1309,37 @@ init_vulkan(
 #endif // NDEBUG
     );
 
-    auto
-        [swapchain,
-         swapchain_images,
-         swapchain_image_format,
-         swapchain_extent] =
-            create_swapchain(device, physical_device, surface, width, height);
+    auto [swapchain, images, image_format, extent] =
+        create_swapchain(device, physical_device, surface, width, height);
 
-    auto swapchain_image_views =
-        create_image_views(device, swapchain_images, swapchain_image_format);
+    std::vector<vk::UniqueImageView> image_views(
+        create_image_views(device, images, image_format));
 
-    auto render_pass = create_render_pass(
-        device, static_cast<VkFormat>(swapchain_image_format));
+    debug(
+        "image view front after creating buffers {}",
+        image_views.front().get());
+
+    vk::UniqueRenderPass render_pass(create_render_pass(device, image_format));
+
+    debug("render pass after creation {}", render_pass.get());
 
     auto [pipeline_layout, graphics_pipeline] =
-        create_graphics_pipeline(device, swapchain_extent, render_pass);
+        create_graphics_pipeline(device, extent, render_pass);
 
-    auto swapchain_framebuffers = create_framebuffers(
-        device, render_pass, swapchain_image_views, swapchain_extent);
+    debug(
+        "image view front before creating buffers {}",
+        image_views.front().get());
+
+    auto framebuffers =
+        create_framebuffers(device, render_pass, image_views, extent);
 
     auto command_pool = create_command_pool(device, physical_device, surface);
 
     auto command_buffers = create_command_buffers(
         device,
-        swapchain_framebuffers,
-        render_pass,
-        swapchain_extent,
+        framebuffers,
+        *render_pass,
+        extent,
         graphics_pipeline,
         command_pool);
 
@@ -1357,7 +1347,7 @@ init_vulkan(
         [image_available_semaphores,
          render_finished_semaphores,
          inflight_fences,
-         images_inflight] = create_sync_objects(device, swapchain_images);
+         images_inflight] = create_sync_objects(device, images);
 
     return std::tuple{
 #ifndef NDEBUG
@@ -1369,14 +1359,14 @@ init_vulkan(
         std::move(present_queue),
         std::move(surface),
         std::move(swapchain),
-        std::move(swapchain_images),
-        std::move(swapchain_image_format),
-        std::move(swapchain_extent),
-        std::move(swapchain_image_views),
+        std::move(images),
+        std::move(image_format),
+        std::move(extent),
+        std::move(image_views),
         std::move(pipeline_layout),
         std::move(graphics_pipeline),
         std::move(render_pass),
-        std::move(swapchain_framebuffers),
+        std::move(framebuffers),
         std::move(command_pool),
         std::move(command_buffers),
         std::move(image_available_semaphores),
@@ -1443,8 +1433,8 @@ draw_frame(
         VK_NULL_HANDLE,
         &image_index);
 
-    // check if a previous frame is using this image (i.e. there is its fence to
-    // wait on)
+    // check if a previous frame is using this image (i.e. there is its
+    // fence to wait on)
     if (images_inflight[image_index] != VK_NULL_HANDLE) {
         vkWaitForFences(
             *device, 1, &images_inflight[image_index], VK_TRUE, UINT64_MAX);
@@ -1497,16 +1487,13 @@ draw_frame(
 
 void
 cleanup(
-    vk::UniqueDevice&           device,
-    std::vector<VkImageView>&   swapchain_image_views,
-    VkPipelineLayout            pipeline_layout,
-    VkPipeline                  graphics_pipeline,
-    VkRenderPass                render_pass,
-    std::vector<VkFramebuffer>& swapchain_framebuffers,
-    VkCommandPool               command_pool,
-    std::vector<VkSemaphore>&   image_available_semaphores,
-    std::vector<VkSemaphore>&   render_finished_semaphores,
-    std::vector<VkFence>&       inflight_fences) noexcept
+    const vk::UniqueDevice&   device,
+    VkPipelineLayout          pipeline_layout,
+    VkPipeline                graphics_pipeline,
+    VkCommandPool             command_pool,
+    std::vector<VkSemaphore>& image_available_semaphores,
+    std::vector<VkSemaphore>& render_finished_semaphores,
+    std::vector<VkFence>&     inflight_fences) noexcept
 {
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         vkDestroySemaphore(*device, render_finished_semaphores[i], nullptr);
@@ -1515,18 +1502,8 @@ cleanup(
     }
 
     vkDestroyCommandPool(*device, command_pool, nullptr);
-
-    for (auto framebuffer : swapchain_framebuffers) {
-        vkDestroyFramebuffer(*device, framebuffer, nullptr);
-    }
-
     vkDestroyPipeline(*device, graphics_pipeline, nullptr);
     vkDestroyPipelineLayout(*device, pipeline_layout, nullptr);
-    vkDestroyRenderPass(*device, render_pass, nullptr);
-
-    for (auto image_view : swapchain_image_views) {
-        vkDestroyImageView(*device, image_view, nullptr);
-    }
 }
 
 std::vector<const char*>
