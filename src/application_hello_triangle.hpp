@@ -29,10 +29,10 @@ class hello_triangle {
     vk::Extent2D                       _extent;
     std::vector<vk::UniqueImageView>   _image_views;
     vk::UniqueRenderPass               _render_pass;
-    VkPipelineLayout                   _pipeline_layout;
-    VkPipeline                         _graphics_pipeline;
+    vk::UniquePipelineLayout           _pipeline_layout;
+    vk::UniquePipeline                 _graphics_pipeline;
     std::vector<vk::UniqueFramebuffer> _framebuffers;
-    VkCommandPool                      _command_pool;
+    vk::UniqueCommandPool              _command_pool;
     std::vector<VkCommandBuffer>       _command_buffers;
     std::vector<VkSemaphore>           _image_available_semaphores;
     std::vector<VkSemaphore>           _render_finished_semaphores;
