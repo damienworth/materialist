@@ -18,10 +18,11 @@ class hello_triangle {
     vk::UniqueDebugUtilsMessengerEXT _debug_messenger;
 #endif // NDEBUG
 
-    vk::UniqueDevice                   _device;
+    vk::UniqueSurfaceKHR _surface;
+    vk::UniqueDevice     _device;
+
     vk::Queue                          _graphics_queue;
     vk::Queue                          _present_queue;
-    vk::UniqueSurfaceKHR               _surface;
     vk::UniqueSwapchainKHR             _swapchain;
     std::vector<vk::Image>             _images;
     vk::Format                         _image_format;
@@ -42,7 +43,15 @@ class hello_triangle {
 
 #ifndef NDEBUG
     const std::vector<const char*> _validation_layers = {
-        "VK_LAYER_KHRONOS_validation"};
+        "VK_LAYER_KHRONOS_validation",
+        "VK_LAYER_LUNARG_api_dump",
+        "VK_LAYER_LUNARG_demo_layer",
+        "VK_LAYER_LUNARG_device_simulation",
+        "VK_LAYER_LUNARG_monitor",
+        "VK_LAYER_LUNARG_screenshot",
+        "VK_LAYER_LUNARG_standard_validation",
+        "VK_LAYER_LUNARG_starter_layer",
+        "VK_LAYER_RENDERDOC_Capture"};
 #endif // NDEBUG
 
 public:

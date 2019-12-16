@@ -53,8 +53,8 @@ PRIVATE
     GLFW_INCLUDE_VULKAN
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_RADIANS
-    VULKAN_HPP_NO_EXCEPTIONS
-    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+    VULKAN_HPP_NO_EXCEPTIONS)
 
 if (UNIX AND NOT APPLE)
     target_compile_options(materialist
@@ -74,8 +74,8 @@ endif (UNIX AND NOT APPLE)
 
 target_link_libraries(materialist
 PRIVATE
-    ubsan
-    asan
+#    ubsan
+#asan
     fmt::fmt
     spdlog::spdlog_header_only
     glm_static

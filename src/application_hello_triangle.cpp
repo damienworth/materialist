@@ -825,14 +825,11 @@ create_image_views(
             component_mapping,
             subresource_range);
 
-        auto [result, view] = device->createImageView(ivci);
+        auto [result, view] = device->createImageViewUnique(ivci);
         if (result != vk::Result::eSuccess) {
             ERROR("failed to create image view");
         }
-        // debug("unique image view after creation {}", view.get());
-        image_views.emplace_back(std::move(view));
-        // debug("unique image view after emplace {}",
-        // image_views.back().get());
+        image_views.push_back(std::move(view));
     }
 
     return image_views;
@@ -1281,10 +1278,6 @@ init_vulkan(
 #endif // NDEBUG
     ) noexcept
 {
-    vk::DynamicLoader dl;
-    auto              vkInstanceProcAddr =
-        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkInstanceProcAddr);
     auto instance = create_instance(
 #ifndef NDEBUG
         validation_layers
@@ -1308,6 +1301,8 @@ init_vulkan(
         validation_layers
 #endif // NDEBUG
     );
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
 
     auto [swapchain, images, image_format, extent] =
         create_swapchain(device, physical_device, surface, width, height);
