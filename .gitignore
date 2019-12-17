@@ -1,6 +1,11 @@
 # build folder
 build/
 
+# vim temporary files
+*.swp
+*.swo
+*.swn
+
 # Prerequisites
 *.d
 

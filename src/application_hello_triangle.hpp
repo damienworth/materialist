@@ -3,44 +3,55 @@
 
 #include <vector>
 
-#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.hpp>
+
+#include "glfwwindow.hpp"
 
 namespace application {
 
 class hello_triangle {
-    GLFWwindow*                  _window = nullptr;
-    const int                    _WIDTH  = 800;
-    const int                    _HEIGHT = 600;
-    VkInstance                   _instance;
-    VkDevice                     _device;
-    VkQueue                      _graphics_queue;
-    VkQueue                      _present_queue;
-    VkSwapchainKHR               _swapchain;
-    std::vector<VkImage>         _swapchain_images;
-    VkFormat                     _swapchain_image_format;
-    VkExtent2D                   _swapchain_extent;
-    std::vector<VkImageView>     _swapchain_image_views;
-    VkRenderPass                 _render_pass;
-    VkPipelineLayout             _pipeline_layout;
-    VkPipeline                   _graphics_pipeline;
-    std::vector<VkFramebuffer>   _swapchain_framebuffers;
-    VkCommandPool                _command_pool;
-    std::vector<VkCommandBuffer> _command_buffers;
-    std::vector<VkSemaphore>     _image_available_semaphores;
-    std::vector<VkSemaphore>     _render_finished_semaphores;
-    std::vector<VkFence>         _inflight_fences;
-    std::vector<VkFence>         _images_inflight;
-    size_t                       _current_frame = 0;
+    glfw::window _window;
+
+    vk::UniqueInstance _instance;
 
 #ifndef NDEBUG
-    VkDebugUtilsMessengerEXT _debug_messenger;
+    vk::UniqueDebugUtilsMessengerEXT _debug_messenger;
 #endif // NDEBUG
 
-    VkSurfaceKHR _surface;
+    vk::UniqueSurfaceKHR _surface;
+    vk::UniqueDevice     _device;
+
+    vk::Queue                            _graphics_queue;
+    vk::Queue                            _present_queue;
+    vk::UniqueSwapchainKHR               _swapchain;
+    std::vector<vk::Image>               _images;
+    vk::Format                           _image_format;
+    vk::Extent2D                         _extent;
+    std::vector<vk::UniqueImageView>     _image_views;
+    vk::UniqueRenderPass                 _render_pass;
+    vk::UniquePipelineLayout             _pipeline_layout;
+    vk::UniquePipeline                   _graphics_pipeline;
+    std::vector<vk::UniqueFramebuffer>   _framebuffers;
+    vk::UniqueCommandPool                _command_pool;
+    std::vector<vk::UniqueCommandBuffer> _command_buffers;
+    std::vector<vk::UniqueSemaphore>     _image_available_semaphores;
+    std::vector<vk::UniqueSemaphore>     _render_finished_semaphores;
+    std::vector<vk::UniqueFence>         _inflight_fences;
+    std::vector<vk::Fence>               _images_inflight;
+
+    size_t _current_frame = 0;
 
 #ifndef NDEBUG
     const std::vector<const char*> _validation_layers = {
-        "VK_LAYER_KHRONOS_validation"};
+        "VK_LAYER_KHRONOS_validation",
+        "VK_LAYER_LUNARG_api_dump",
+        "VK_LAYER_LUNARG_demo_layer",
+        "VK_LAYER_LUNARG_device_simulation",
+        "VK_LAYER_LUNARG_monitor",
+        "VK_LAYER_LUNARG_screenshot",
+        "VK_LAYER_LUNARG_standard_validation",
+        "VK_LAYER_LUNARG_starter_layer",
+        "VK_LAYER_RENDERDOC_Capture"};
 #endif // NDEBUG
 
 public:

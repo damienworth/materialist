@@ -2,11 +2,19 @@
 
 #include "spdlog_all.hpp"
 
+#include <vulkan/vulkan.hpp>
+
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
 #include "application_hello_triangle.hpp"
 
 int
 main(int, char**)
 {
+    vk::DynamicLoader         dl;
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
+        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 #ifndef NDEBUG
     spdlog::set_level(spdlog::level::debug);
 #endif // NDEBUG
