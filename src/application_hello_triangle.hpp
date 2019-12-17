@@ -21,23 +21,23 @@ class hello_triangle {
     vk::UniqueSurfaceKHR _surface;
     vk::UniqueDevice     _device;
 
-    vk::Queue                          _graphics_queue;
-    vk::Queue                          _present_queue;
-    vk::UniqueSwapchainKHR             _swapchain;
-    std::vector<vk::Image>             _images;
-    vk::Format                         _image_format;
-    vk::Extent2D                       _extent;
-    std::vector<vk::UniqueImageView>   _image_views;
-    vk::UniqueRenderPass               _render_pass;
-    vk::UniquePipelineLayout           _pipeline_layout;
-    vk::UniquePipeline                 _graphics_pipeline;
-    std::vector<vk::UniqueFramebuffer> _framebuffers;
-    vk::UniqueCommandPool              _command_pool;
-    std::vector<VkCommandBuffer>       _command_buffers;
-    std::vector<VkSemaphore>           _image_available_semaphores;
-    std::vector<VkSemaphore>           _render_finished_semaphores;
-    std::vector<VkFence>               _inflight_fences;
-    std::vector<VkFence>               _images_inflight;
+    vk::Queue                            _graphics_queue;
+    vk::Queue                            _present_queue;
+    vk::UniqueSwapchainKHR               _swapchain;
+    std::vector<vk::Image>               _images;
+    vk::Format                           _image_format;
+    vk::Extent2D                         _extent;
+    std::vector<vk::UniqueImageView>     _image_views;
+    vk::UniqueRenderPass                 _render_pass;
+    vk::UniquePipelineLayout             _pipeline_layout;
+    vk::UniquePipeline                   _graphics_pipeline;
+    std::vector<vk::UniqueFramebuffer>   _framebuffers;
+    vk::UniqueCommandPool                _command_pool;
+    std::vector<vk::UniqueCommandBuffer> _command_buffers;
+    std::vector<vk::UniqueSemaphore>     _image_available_semaphores;
+    std::vector<vk::UniqueSemaphore>     _render_finished_semaphores;
+    std::vector<vk::UniqueFence>         _inflight_fences;
+    std::vector<vk::Fence>               _images_inflight;
 
     size_t _current_frame = 0;
 

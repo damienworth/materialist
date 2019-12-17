@@ -63,7 +63,7 @@ vk::PhysicalDevice pick_physical_device(
     vk::UniqueSurfaceKHR&,
     const std::vector<const char*>&) noexcept;
 
-std::tuple<vk::UniqueDevice, vk::Queue, VkQueue> create_logical_device(
+std::tuple<vk::UniqueDevice, vk::Queue, vk::Queue> create_logical_device(
     vk::PhysicalDevice,
     vk::UniqueSurfaceKHR&,
     const std::vector<const char*>&
@@ -140,19 +140,19 @@ std::vector<vk::UniqueFramebuffer> create_framebuffers(
 vk::UniqueCommandPool create_command_pool(
     vk::UniqueDevice&, vk::PhysicalDevice, vk::UniqueSurfaceKHR&) noexcept;
 
-std::vector<VkCommandBuffer> create_command_buffers(
+std::vector<vk::UniqueCommandBuffer> create_command_buffers(
     vk::UniqueDevice&,
     const std::vector<vk::UniqueFramebuffer>&,
-    vk::RenderPass,
+    vk::UniqueRenderPass&,
     vk::Extent2D,
     vk::UniquePipeline&,
     vk::UniqueCommandPool&) noexcept;
 
 std::tuple<
-    std::vector<VkSemaphore>,
-    std::vector<VkSemaphore>,
-    std::vector<VkFence>,
-    std::vector<VkFence>>
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueFence>,
+    std::vector<vk::Fence>>
 create_sync_objects(vk::UniqueDevice&, const std::vector<vk::Image>&) noexcept;
 
 std::vector<char> read_file(std::string_view filename) noexcept;
@@ -179,11 +179,11 @@ std::tuple<
     vk::UniqueRenderPass,
     std::vector<vk::UniqueFramebuffer>,
     vk::UniqueCommandPool,
-    std::vector<VkCommandBuffer>,
-    std::vector<VkSemaphore>,
-    std::vector<VkSemaphore>,
-    std::vector<VkFence>,
-    std::vector<VkFence>>
+    std::vector<vk::UniqueCommandBuffer>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueFence>,
+    std::vector<vk::Fence>>
 init_vulkan(
     GLFWwindow*,
     const std::vector<const char*>&,
@@ -200,11 +200,11 @@ void main_loop(
     vk::Queue,
     vk::Queue,
     vk::UniqueSwapchainKHR&,
-    const std::vector<VkCommandBuffer>&,
-    const std::vector<VkSemaphore>&,
-    const std::vector<VkSemaphore>&,
-    const std::vector<VkFence>&,
-    std::vector<VkFence>&,
+    const std::vector<vk::UniqueCommandBuffer>&,
+    const std::vector<vk::UniqueSemaphore>&,
+    const std::vector<vk::UniqueSemaphore>&,
+    const std::vector<vk::UniqueFence>&,
+    std::vector<vk::Fence>&,
     size_t&,
     GLFWwindow*) noexcept;
 
@@ -213,18 +213,12 @@ void draw_frame(
     vk::Queue,
     vk::Queue,
     vk::UniqueSwapchainKHR&,
-    const std::vector<VkCommandBuffer>&,
-    const std::vector<VkSemaphore>&,
-    const std::vector<VkSemaphore>&,
-    const std::vector<VkFence>&,
-    std::vector<VkFence>&,
+    const std::vector<vk::UniqueCommandBuffer>&,
+    const std::vector<vk::UniqueSemaphore>&,
+    const std::vector<vk::UniqueSemaphore>&,
+    const std::vector<vk::UniqueFence>&,
+    std::vector<vk::Fence>&,
     size_t&) noexcept;
-
-void cleanup(
-    const vk::UniqueDevice&,
-    std::vector<VkSemaphore>&,
-    std::vector<VkSemaphore>&,
-    std::vector<VkFence>&) noexcept;
 
 std::vector<const char*> get_required_extensions() noexcept;
 
@@ -292,11 +286,6 @@ hello_triangle::run() noexcept
         _images_inflight,
         _current_frame,
         *_window);
-    cleanup(
-        _device,
-        _image_available_semaphores,
-        _render_finished_semaphores,
-        _inflight_fences);
 }
 
 namespace /* anonymous */ {
@@ -337,11 +326,10 @@ bool
 check_validation_layer_support(
     const std::vector<const char*>& validation_layers) noexcept
 {
-    uint32_t layer_count;
-    vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-
-    std::vector<VkLayerProperties> available_layers(layer_count);
-    vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
+    auto [result, available_layers] = vk::enumerateInstanceLayerProperties();
+    if (result != vk::Result::eSuccess) {
+        ERROR("failed to get instance layer properties count");
+    }
 
     debug("available validation layers:");
     for (const auto& layer_properties : available_layers) {
@@ -407,17 +395,16 @@ create_instance(
     auto [result, instance] = vk::createInstanceUnique(create_info);
     if (result != vk::Result::eSuccess) { ERROR("failed to create instance!"); }
 
-    uint32_t extension_props_count = 0;
-    vkEnumerateInstanceExtensionProperties(
-        nullptr, &extension_props_count, nullptr);
-    std::vector<VkExtensionProperties> extensions_props(extension_props_count);
-    vkEnumerateInstanceExtensionProperties(
-        nullptr, &extension_props_count, extensions_props.data());
+    auto [eiepresult, extension_props] =
+        vk::enumerateInstanceExtensionProperties();
+    if (eiepresult != vk::Result::eSuccess) {
+        ERROR("failed to enumerate instance extension properties");
+    }
 
 #ifndef NDEBUG
     debug("available extensions_properties:");
 
-    for (const auto& extension : extensions_props) {
+    for (const auto& extension : extension_props) {
         debug("\t{}", extension.extensionName);
     }
     debug("");
@@ -440,10 +427,8 @@ is_device_suitable(
     vk::UniqueSurfaceKHR&           surface,
     const std::vector<const char*>& device_extensions) noexcept
 {
-    VkPhysicalDeviceProperties device_properties;
-    VkPhysicalDeviceFeatures   device_features;
-    vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    vkGetPhysicalDeviceFeatures(physical_device, &device_features);
+    auto device_features   = physical_device.getFeatures();
+    auto device_properties = physical_device.getProperties();
 
     bool extensions_supported =
         check_device_extension_support(physical_device, device_extensions);
@@ -457,7 +442,7 @@ is_device_suitable(
 
     return indices &&
            device_properties.deviceType ==
-               VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+               vk::PhysicalDeviceType::eDiscreteGpu &&
            device_features.geometryShader && swapchain_support;
 }
 
@@ -466,16 +451,11 @@ check_device_extension_support(
     vk::PhysicalDevice              physical_device,
     const std::vector<const char*>& device_extensions) noexcept
 {
-    uint32_t extension_count;
-    vkEnumerateDeviceExtensionProperties(
-        physical_device, nullptr, &extension_count, nullptr);
-
-    std::vector<VkExtensionProperties> available_extensions(extension_count);
-    vkEnumerateDeviceExtensionProperties(
-        physical_device,
-        nullptr,
-        &extension_count,
-        available_extensions.data());
+    auto [result, available_extensions] =
+        physical_device.enumerateDeviceExtensionProperties();
+    if (result != vk::Result::eSuccess) {
+        ERROR("failed to enumerate device extension properties");
+    }
 
     std::set<std::string> required_extensions(
         begin(device_extensions), end(device_extensions));
@@ -516,7 +496,7 @@ pick_physical_device(
     return physical_device;
 }
 
-std::tuple<vk::UniqueDevice, vk::Queue, VkQueue>
+std::tuple<vk::UniqueDevice, vk::Queue, vk::Queue>
 create_logical_device(
     vk::PhysicalDevice              physical_device,
     vk::UniqueSurfaceKHR&           surface,
@@ -706,8 +686,8 @@ choose_swap_extent(
         return capabilities.currentExtent;
     }
 
-    VkExtent2D actual_extent = {static_cast<uint32_t>(width),
-                                static_cast<uint32_t>(height)};
+    vk::Extent2D actual_extent = {static_cast<uint32_t>(width),
+                                  static_cast<uint32_t>(height)};
 
     std::clamp(
         actual_extent.width,
@@ -867,7 +847,6 @@ create_render_pass(
     if (result != vk::Result::eSuccess) {
         ERROR("failed to create render pass");
     }
-    debug("render pass after creation {}", render_pass.get());
 
     return std::move(render_pass);
 }
@@ -910,12 +889,13 @@ create_graphics_pipeline(
 
     vk::PipelineRasterizationStateCreateInfo rasterizer(
         {},
-        VK_FALSE,
-        VK_FALSE,
+        false,
+        false,
         vk::PolygonMode::eFill,
         vk::CullModeFlagBits::eBack,
         vk::FrontFace::eClockwise,
-        VK_FALSE,
+        false,
+        0.f,
         0.f,
         0.f,
         1.f);
@@ -1003,7 +983,6 @@ create_framebuffers(
     framebuffers.reserve(image_views.size());
 
     for (auto const& view : image_views) {
-        debug("view is {}", *view);
         auto                      attachments = std::array{*view};
         vk::FramebufferCreateInfo fci(
             {},
@@ -1042,104 +1021,97 @@ create_command_pool(
     return std::move(command_pool);
 }
 
-std::vector<VkCommandBuffer>
+std::vector<vk::UniqueCommandBuffer>
 create_command_buffers(
     vk::UniqueDevice&                         device,
     const std::vector<vk::UniqueFramebuffer>& framebuffers,
-    vk::RenderPass                            render_pass,
+    vk::UniqueRenderPass&                     render_pass,
     vk::Extent2D                              extent,
     vk::UniquePipeline&                       graphics_pipeline,
     vk::UniqueCommandPool&                    command_pool) noexcept
 {
-    std::vector<VkCommandBuffer> command_buffers;
-    command_buffers.resize(framebuffers.size());
+    vk::CommandBufferAllocateInfo cbai(
+        *command_pool,
+        vk::CommandBufferLevel::ePrimary,
+        gsl::narrow<uint32_t>(framebuffers.size()));
 
-    VkCommandBufferAllocateInfo alloc_info = {};
-    alloc_info.sType       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc_info.commandPool = *command_pool;
-    alloc_info.level       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount =
-        static_cast<uint32_t>(command_buffers.size());
-
-    if (vkAllocateCommandBuffers(
-            *device, &alloc_info, command_buffers.data()) != VK_SUCCESS) {
+    auto [result, command_buffers] = device->allocateCommandBuffersUnique(cbai);
+    if (result != vk::Result::eSuccess) {
         ERROR("failed to allocate command buffers");
     }
 
-    for (size_t i = 0; i != command_buffers.size(); ++i) {
-        VkCommandBufferBeginInfo begin_info = {};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.flags = 0;
-        begin_info.pInheritanceInfo = nullptr;
+    vk::ClearValue clear_color(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
 
-        if (vkBeginCommandBuffer(command_buffers[i], &begin_info) !=
-            VK_SUCCESS) {
+    for (size_t i = 0; i != command_buffers.size(); ++i) {
+        result = command_buffers[i]->begin(vk::CommandBufferBeginInfo());
+        if (result != vk::Result::eSuccess) {
             ERROR("failed to begin recording command buffer");
         }
 
-        VkRenderPassBeginInfo render_pass_info = {};
-        render_pass_info.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        render_pass_info.renderPass  = render_pass;
-        render_pass_info.framebuffer = *framebuffers[i];
-        render_pass_info.renderArea.offset = {0, 0};
-        render_pass_info.renderArea.extent = extent;
+        vk::RenderPassBeginInfo render_pass_info(
+            *render_pass,
+            *framebuffers[i],
+            vk::Rect2D(vk::Offset2D(0.f, 0.f), extent),
+            1,
+            &clear_color);
 
-        VkClearValue clear_color         = {0.f, 0.f, 0.f, 1.f};
-        render_pass_info.clearValueCount = 1;
-        render_pass_info.pClearValues    = &clear_color;
+        command_buffers[i]->beginRenderPass(
+            render_pass_info, vk::SubpassContents::eInline);
 
-        vkCmdBeginRenderPass(
-            command_buffers[i], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(
-            command_buffers[i],
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            *graphics_pipeline);
-        vkCmdDraw(command_buffers[i], 3, 1, 0, 0);
-        vkCmdEndRenderPass(command_buffers[i]);
+        command_buffers[i]->bindPipeline(
+            vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
 
-        if (vkEndCommandBuffer(command_buffers[i]) != VK_SUCCESS) {
+        command_buffers[i]->draw(3, 1, 0, 0);
+        command_buffers[i]->endRenderPass();
+
+        if (command_buffers[i]->end() != vk::Result::eSuccess) {
             ERROR("failed to record command buffer");
         }
     }
 
-    return command_buffers;
+    return std::move(command_buffers);
 }
 
 std::tuple<
-    std::vector<VkSemaphore>,
-    std::vector<VkSemaphore>,
-    std::vector<VkFence>,
-    std::vector<VkFence>>
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueFence>,
+    std::vector<vk::Fence>>
 create_sync_objects(
     vk::UniqueDevice& device, const std::vector<vk::Image>& images) noexcept
 {
-    VkSemaphoreCreateInfo semaphore_info = {};
-    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    vk::SemaphoreCreateInfo sci;
 
-    VkFenceCreateInfo fence_info = {};
-    fence_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fence_info.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
+    vk::FenceCreateInfo fci(vk::FenceCreateFlagBits::eSignaled);
 
-    std::vector<VkSemaphore> image_available_semaphores(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkSemaphore> render_finished_semaphores(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkFence>     inflight_fences(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkFence>     images_inflight(images.size(), VK_NULL_HANDLE);
+    std::vector<vk::UniqueSemaphore> image_available_semaphores;
+    image_available_semaphores.reserve(MAX_FRAMES_IN_FLIGHT);
+    std::vector<vk::UniqueSemaphore> render_finished_semaphores;
+    render_finished_semaphores.reserve(MAX_FRAMES_IN_FLIGHT);
+    std::vector<vk::UniqueFence> inflight_fences;
+    inflight_fences.reserve(MAX_FRAMES_IN_FLIGHT);
+    std::vector<vk::Fence> images_inflight(images.size());
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
-        if (vkCreateSemaphore(
-                *device,
-                &semaphore_info,
-                nullptr,
-                &image_available_semaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(
-                *device,
-                &semaphore_info,
-                nullptr,
-                &render_finished_semaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(*device, &fence_info, nullptr, &inflight_fences[i]) !=
-                VK_SUCCESS) {
-            ERROR("failed to create synchronization objects for a frame");
+        auto [iaresult, ia_semaphore] = device->createSemaphoreUnique(sci);
+        if (iaresult != vk::Result::eSuccess) {
+            ERROR("failed to create semaphore");
         }
+
+        auto [rfresult, rf_semaphore] = device->createSemaphoreUnique(sci);
+        if (rfresult != vk::Result::eSuccess) {
+            ERROR("failed to create semaphore");
+        }
+
+        image_available_semaphores.push_back(std::move(ia_semaphore));
+        render_finished_semaphores.push_back(std::move(rf_semaphore));
+
+        auto [ifresult, if_fence] = device->createFenceUnique(fci);
+        if (ifresult != vk::Result::eSuccess) {
+            ERROR("failed to create fence");
+        }
+
+        inflight_fences.push_back(std::move(if_fence));
     }
 
     return {std::move(image_available_semaphores),
@@ -1197,11 +1169,11 @@ std::tuple<
     vk::UniqueRenderPass,
     std::vector<vk::UniqueFramebuffer>,
     vk::UniqueCommandPool,
-    std::vector<VkCommandBuffer>,
-    std::vector<VkSemaphore>,
-    std::vector<VkSemaphore>,
-    std::vector<VkFence>,
-    std::vector<VkFence>>
+    std::vector<vk::UniqueCommandBuffer>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueSemaphore>,
+    std::vector<vk::UniqueFence>,
+    std::vector<vk::Fence>>
 init_vulkan(
     GLFWwindow*                     window,
     const std::vector<const char*>& device_extensions,
@@ -1245,20 +1217,10 @@ init_vulkan(
     std::vector<vk::UniqueImageView> image_views(
         create_image_views(device, images, image_format));
 
-    debug(
-        "image view front after creating buffers {}",
-        image_views.front().get());
-
     vk::UniqueRenderPass render_pass(create_render_pass(device, image_format));
-
-    debug("render pass after creation {}", render_pass.get());
 
     auto [pipeline_layout, graphics_pipeline] =
         create_graphics_pipeline(device, extent, render_pass);
-
-    debug(
-        "image view front before creating buffers {}",
-        image_views.front().get());
 
     auto framebuffers =
         create_framebuffers(device, render_pass, image_views, extent);
@@ -1268,7 +1230,7 @@ init_vulkan(
     auto command_buffers = create_command_buffers(
         device,
         framebuffers,
-        *render_pass,
+        render_pass,
         extent,
         graphics_pipeline,
         command_pool);
@@ -1307,17 +1269,17 @@ init_vulkan(
 
 void
 main_loop(
-    vk::UniqueDevice&                   device,
-    vk::Queue                           graphics_queue,
-    vk::Queue                           present_queue,
-    vk::UniqueSwapchainKHR&             swapchain,
-    const std::vector<VkCommandBuffer>& command_buffers,
-    const std::vector<VkSemaphore>&     image_available_semaphores,
-    const std::vector<VkSemaphore>&     render_finished_semaphores,
-    const std::vector<VkFence>&         inflight_fences,
-    std::vector<VkFence>&               images_inflight,
-    size_t&                             current_frame,
-    GLFWwindow*                         window) noexcept
+    vk::UniqueDevice&                           device,
+    vk::Queue                                   graphics_queue,
+    vk::Queue                                   present_queue,
+    vk::UniqueSwapchainKHR&                     swapchain,
+    const std::vector<vk::UniqueCommandBuffer>& command_buffers,
+    const std::vector<vk::UniqueSemaphore>&     image_available_semaphores,
+    const std::vector<vk::UniqueSemaphore>&     render_finished_semaphores,
+    const std::vector<vk::UniqueFence>&         inflight_fences,
+    std::vector<vk::Fence>&                     images_inflight,
+    size_t&                                     current_frame,
+    GLFWwindow*                                 window) noexcept
 {
     assert(window);
     while (!glfwWindowShouldClose(window)) {
@@ -1335,98 +1297,86 @@ main_loop(
             current_frame);
     }
 
-    vkDeviceWaitIdle(*device);
+    device->waitIdle();
 }
 
 void
 draw_frame(
-    vk::UniqueDevice&                   device,
-    vk::Queue                           graphics_queue,
-    vk::Queue                           present_queue,
-    vk::UniqueSwapchainKHR&             swapchain,
-    const std::vector<VkCommandBuffer>& command_buffers,
-    const std::vector<VkSemaphore>&     image_available_semaphores,
-    const std::vector<VkSemaphore>&     render_finished_semaphores,
-    const std::vector<VkFence>&         inflight_fences,
-    std::vector<VkFence>&               images_inflight,
-    size_t&                             current_frame) noexcept
+    vk::UniqueDevice&                           device,
+    vk::Queue                                   graphics_queue,
+    vk::Queue                                   present_queue,
+    vk::UniqueSwapchainKHR&                     swapchain,
+    const std::vector<vk::UniqueCommandBuffer>& command_buffers,
+    const std::vector<vk::UniqueSemaphore>&     image_available_semaphores,
+    const std::vector<vk::UniqueSemaphore>&     render_finished_semaphores,
+    const std::vector<vk::UniqueFence>&         inflight_fences,
+    std::vector<vk::Fence>&                     images_inflight,
+    size_t&                                     current_frame) noexcept
 {
-    vkWaitForFences(
-        *device, 1, &inflight_fences[current_frame], VK_TRUE, UINT64_MAX);
+    if (vk::Result::eSuccess !=
+        device->waitForFences(
+            *inflight_fences[current_frame], true, UINT64_MAX)) {
+        ERROR("failed to wait for fence");
+    }
 
     uint32_t image_index;
-    vkAcquireNextImageKHR(
-        *device,
+    device->acquireNextImageKHR(
         *swapchain,
         UINT64_MAX,
-        image_available_semaphores[current_frame],
-        VK_NULL_HANDLE,
+        *image_available_semaphores[current_frame],
+        nullptr,
         &image_index);
 
     // check if a previous frame is using this image (i.e. there is its
     // fence to wait on)
-    if (images_inflight[image_index] != VK_NULL_HANDLE) {
-        vkWaitForFences(
-            *device, 1, &images_inflight[image_index], VK_TRUE, UINT64_MAX);
+    if (images_inflight[image_index]) {
+        if (vk::Result::eSuccess !=
+            device->waitForFences(
+                images_inflight[image_index], true, UINT64_MAX)) {
+            ERROR("failed to wait for dence");
+        }
     }
+
     // mark the image as now being in use by this frame
-    images_inflight[image_index] = inflight_fences[current_frame];
+    images_inflight[image_index] = *inflight_fences[current_frame];
 
-    VkSubmitInfo submit_info = {};
-    submit_info.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    vk::Semaphore wait_semaphores[] = {
+        *image_available_semaphores[current_frame]};
+    vk::PipelineStageFlags wait_stages[] = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput};
+    vk::CommandBuffer cmd_buffers[] = {*command_buffers[image_index]};
 
-    VkSemaphore wait_semaphores[] = {image_available_semaphores[current_frame]};
-    VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores    = wait_semaphores;
-    submit_info.pWaitDstStageMask  = wait_stages;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers    = &command_buffers[image_index];
+    vk::Semaphore signal_semaphores[] = {
+        *render_finished_semaphores[current_frame]};
 
-    VkSemaphore signal_semaphores[] = {
-        render_finished_semaphores[current_frame]};
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores    = signal_semaphores;
+    vk::SubmitInfo submit_info(
+        1, wait_semaphores, wait_stages, 1, cmd_buffers, 1, signal_semaphores);
 
-    vkResetFences(*device, 1, &inflight_fences[current_frame]);
+    vk::Fence fences[] = {*inflight_fences[current_frame]};
 
-    if (vkQueueSubmit(
-            graphics_queue, 1, &submit_info, inflight_fences[current_frame]) !=
-        VK_SUCCESS) {
+    if (vk::Result::eSuccess != device->resetFences(1, fences)) {
+        ERROR("failed to reset fences");
+    }
+
+    vk::SubmitInfo submits[] = {submit_info};
+
+    if (vk::Result::eSuccess !=
+        graphics_queue.submit(1, submits, *inflight_fences[current_frame])) {
         ERROR("failed to submit draw command buffer");
     }
 
-    VkPresentInfoKHR present_info   = {};
-    present_info.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores    = signal_semaphores;
+    vk::SwapchainKHR swapchains[] = {*swapchain};
 
-    VkSwapchainKHR swapchains[] = {*swapchain};
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains    = swapchains;
-    present_info.pImageIndices  = &image_index;
-    present_info.pResults       = nullptr;
+    vk::PresentInfoKHR present_info(
+        1, signal_semaphores, 1, swapchains, &image_index);
 
-    vkQueuePresentKHR(present_queue, &present_info);
+    if (vk::Result::eSuccess != present_queue.presentKHR(present_info)) {
+        ERROR("failed to presentKHR");
+    }
 
-    vkQueueWaitIdle(present_queue);
+    present_queue.waitIdle();
 
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-}
-
-void
-cleanup(
-    const vk::UniqueDevice&   device,
-    std::vector<VkSemaphore>& image_available_semaphores,
-    std::vector<VkSemaphore>& render_finished_semaphores,
-    std::vector<VkFence>&     inflight_fences) noexcept
-{
-    for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
-        vkDestroySemaphore(*device, render_finished_semaphores[i], nullptr);
-        vkDestroySemaphore(*device, image_available_semaphores[i], nullptr);
-        vkDestroyFence(*device, inflight_fences[i], nullptr);
-    }
 }
 
 std::vector<const char*>
