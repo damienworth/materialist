@@ -7,20 +7,22 @@
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 #include "application_hello_triangle.hpp"
+#include "error_handling.hpp"
 
 int
 main(int, char**)
 {
-    vk::DynamicLoader         dl;
-    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
-        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 #ifndef NDEBUG
     spdlog::set_level(spdlog::level::debug);
 #endif // NDEBUG
 
-    application::hello_triangle app;
+    vk::DynamicLoader dl;
+    if (!dl.success()) { ERROR("failed to create dynamic loader"); }
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
+        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
+    application::hello_triangle app;
     app.run();
 
     return EXIT_SUCCESS;

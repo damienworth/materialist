@@ -26,6 +26,8 @@ add_subdirectory(extern)
 add_executable(materialist
     src/application_hello_triangle.cpp
     src/application_hello_triangle.hpp
+    src/error_handling.cpp
+    src/error_handling.hpp
     src/fmtlib_all.hpp
     src/main.cpp
     src/spdlog_all.hpp)
@@ -53,6 +55,7 @@ PRIVATE
     GLFW_INCLUDE_VULKAN
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_RADIANS
+    VK_NO_PROTOTYPES
     VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
     VULKAN_HPP_NO_EXCEPTIONS)
 
@@ -74,8 +77,8 @@ endif (UNIX AND NOT APPLE)
 
 target_link_libraries(materialist
 PRIVATE
-#    ubsan
-#asan
+    # asan
+    # ubsan
     fmt::fmt
     spdlog::spdlog_header_only
     glm_static

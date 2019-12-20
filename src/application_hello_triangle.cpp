@@ -12,18 +12,7 @@
 
 #include <gsl/gsl_util>
 
-#include "spdlog_all.hpp"
-
-using spdlog::critical;
-using spdlog::debug;
-using spdlog::error;
-using spdlog::info;
-using spdlog::log;
-using spdlog::warn;
-
-#define ERROR(...)              \
-    spdlog::error(__VA_ARGS__); \
-    std::terminate();
+#include "error_handling.hpp"
 
 namespace application {
 
@@ -222,14 +211,6 @@ void draw_frame(
 
 std::vector<const char*> get_required_extensions() noexcept;
 
-#ifndef NDEBUG
-VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT,
-    VkDebugUtilsMessageTypeFlagsEXT,
-    const VkDebugUtilsMessengerCallbackDataEXT*,
-    void*);
-#endif // NDEBUG
-
 } // namespace
 
 void
@@ -331,11 +312,11 @@ check_validation_layer_support(
         ERROR("failed to get instance layer properties count");
     }
 
-    debug("available validation layers:");
+    spdlog::debug("available validation layers:");
     for (const auto& layer_properties : available_layers) {
-        debug("\t{}", layer_properties.layerName);
+        spdlog::debug("\t{}", layer_properties.layerName);
     }
-    debug("");
+    spdlog::debug("");
 
     for (const char* layer_name : validation_layers) {
         bool layer_found = false;
@@ -402,12 +383,12 @@ create_instance(
     }
 
 #ifndef NDEBUG
-    debug("available extensions_properties:");
+    spdlog::debug("available extensions_properties:");
 
     for (const auto& extension : extension_props) {
-        debug("\t{}", extension.extensionName);
+        spdlog::debug("\t{}", extension.extensionName);
     }
-    debug("");
+    spdlog::debug("");
 #endif // NDEBUG
 
     return std::move(instance);
@@ -1403,34 +1384,6 @@ get_required_extensions() noexcept
 
     return extensions;
 }
-
-#ifndef NDEBUG
-VKAPI_ATTR VkBool32 VKAPI_CALL
-                    debug_callback(
-                        VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-                        VkDebugUtilsMessageTypeFlagsEXT,
-                        const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-                        void*)
-{
-    switch (severity) {
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-        debug(callback_data->pMessage);
-        break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-        info(callback_data->pMessage);
-        break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-        warn(callback_data->pMessage);
-        break;
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-        error(callback_data->pMessage);
-        break;
-    default: critical(callback_data->pMessage); break;
-    }
-
-    return VK_FALSE;
-}
-#endif // NDEBUG
 
 } // namespace
 } // namespace application
