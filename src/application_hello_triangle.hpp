@@ -50,8 +50,7 @@ class hello_triangle {
         "VK_LAYER_LUNARG_monitor",
         "VK_LAYER_LUNARG_screenshot",
         "VK_LAYER_LUNARG_standard_validation",
-        "VK_LAYER_LUNARG_starter_layer",
-        "VK_LAYER_RENDERDOC_Capture"};
+        "VK_LAYER_LUNARG_starter_layer"};
 #endif // NDEBUG
 
 public:

@@ -1363,17 +1363,17 @@ draw_frame(
 std::vector<const char*>
 get_required_extensions() noexcept
 {
-    uint32_t     glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    uint32_t     glfw_extension_count = 0;
+    const char** glfw_extensions;
+    glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
     std::vector<const char*> extensions;
     extensions.reserve(
-        glfwExtensionCount +
+        glfw_extension_count +
         1 /* for VK_EXT_DEBUG_UTILS_EXTENSION_NAME in debug builds */);
     std::copy(
-        glfwExtensions,
-        glfwExtensions + glfwExtensionCount,
+        glfw_extensions,
+        glfw_extensions + glfw_extension_count,
         std::back_inserter(extensions));
 
 #ifndef NDEBUG

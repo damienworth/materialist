@@ -30,7 +30,9 @@ add_executable(materialist
     src/error_handling.hpp
     src/fmtlib_all.hpp
     src/main.cpp
-    src/spdlog_all.hpp)
+    src/spdlog_all.hpp
+    src/vulkan_context.cpp
+    src/vulkan_context.hpp)
 
 set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADERS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
