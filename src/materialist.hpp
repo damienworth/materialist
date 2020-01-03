@@ -14,8 +14,7 @@
 #include <vector>
 
 #include <GLFW/glfw3.h>
-#include <gsl/gsl_util>
-#include <gsl/span>
+#include <gsl/gsl>
 #include <vulkan/vulkan.hpp>
 
 #include "application.hpp"

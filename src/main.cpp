@@ -1,4 +1,4 @@
-#include <cstdlib> // EXIT_SUCCESS / EXIT_FAILURE
+#include <cstdlib> // EXIT_SUCCESS
 
 #include "materialist.hpp"
 
@@ -13,3 +13,4 @@ main(int, char**)
 
     return EXIT_SUCCESS;
 }
+

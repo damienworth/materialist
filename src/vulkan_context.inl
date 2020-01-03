@@ -36,11 +36,11 @@ struct context {
     context& operator=(const context&) = delete;
 };
 
-#ifndef NDEBUG
-
 namespace /* anonymous */ {
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
+#ifndef NDEBUG
 
 constexpr auto g_validation_layers = std::array{"VK_LAYER_KHRONOS_validation",
                                                 "VK_LAYER_LUNARG_api_dump",
@@ -53,6 +53,8 @@ constexpr auto g_validation_layers = std::array{"VK_LAYER_KHRONOS_validation",
                                                 "validation",
                                                 "VK_LAYER_LUNARG_starter_"
                                                 "layer"};
+
+#endif // NDEBUG
 
 constexpr auto g_device_extensions =
     std::array{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -82,6 +84,8 @@ get_required_extensions() noexcept
     return extensions;
 }
 
+#ifndef NDEBUG
+
 vk::DebugUtilsMessengerCreateInfoEXT
 populate_debug_messenger_create_info() noexcept
 {
@@ -99,6 +103,8 @@ populate_debug_messenger_create_info() noexcept
     return vk::DebugUtilsMessengerCreateInfoEXT(
         {}, severity_flags, message_type_flags, debug_callback);
 }
+
+#endif // NDEBUG
 
 bool
 check_device_extension_support(vk::PhysicalDevice physical_device) noexcept
@@ -348,6 +354,8 @@ initialize(context& ctx, int width, int height) noexcept
 
     create_sync_objects(ctx);
 }
+
+#ifndef NDEBUG
 
 void
 create_debug_utils_messenger_EXT(context& ctx) noexcept
