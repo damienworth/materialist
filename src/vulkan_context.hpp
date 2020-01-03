@@ -1,8 +1,6 @@
 #ifndef MATERIALIST_VULKAN_CONTEXT_HPP
 #define MATERIALIST_VULKAN_CONTEXT_HPP
 
-#include <gsl/span>
-
 namespace vulkan {
 
 struct context;
@@ -35,7 +33,7 @@ void create_command_pool(context&) noexcept;
 
 void create_command_buffers(context&) noexcept;
 
-void create_sync_objects(context& ctx) noexcept;
+void create_sync_objects(context&) noexcept;
 
 } // namespace vulkan
 

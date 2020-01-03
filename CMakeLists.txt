@@ -24,14 +24,13 @@ endif (NOT MAKE)
 add_subdirectory(extern)
 
 add_executable(materialist
-    src/application_hello_triangle.cpp
-    src/application_hello_triangle.hpp
+    src/application.hpp
     src/error_handling.cpp
     src/error_handling.hpp
     src/fmtlib_all.hpp
     src/main.cpp
+    src/materialist.hpp
     src/spdlog_all.hpp
-    src/vulkan_context.cpp
     src/vulkan_context.hpp)
 
 set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)

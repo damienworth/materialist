@@ -1,19 +1,3 @@
-#include "vulkan_context.hpp"
-
-#include <algorithm>
-#include <array>
-#include <fstream>
-#include <set>
-#include <vector>
-
-#include <GLFW/glfw3.h>
-
-#include <vulkan/vulkan.hpp>
-
-#include "error_handling.hpp"
-#include "glfwwindow.hpp"
-#include "spdlog_all.hpp"
-
 namespace vulkan {
 
 struct context {
@@ -326,8 +310,12 @@ create_shader_module(vk::Device& device, const std::vector<char>& code) noexcept
 } // namespace
 
 void
-initialize_context(context& ctx, int width, int height) noexcept
+initialize(context& ctx, int width, int height) noexcept
 {
+    if (!ctx.window.create("Materialist", width, height)) {
+        ERROR("failed to create window");
+    }
+
     create_instance(ctx);
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(*ctx.instance);
@@ -796,6 +784,8 @@ create_graphics_pipeline(context& ctx) noexcept
         ERROR("failed to create pipeline layout");
     }
 
+    ctx.pipeline_layout = std::move(pipeline_layout);
+
     auto shader_stages = std::array{vert_pssci, frag_pssci};
 
     vk::GraphicsPipelineCreateInfo gpci(
@@ -820,7 +810,6 @@ create_graphics_pipeline(context& ctx) noexcept
         ERROR("failed to create graphics pipeline");
     }
 
-    ctx.pipeline_layout   = std::move(pipeline_layout);
     ctx.graphics_pipeline = std::move(graphics_pipeline.front());
 }
 
