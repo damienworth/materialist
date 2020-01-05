@@ -25,6 +25,8 @@ main_loop() noexcept
         glfwPollEvents();
         draw_frame(context);
     }
+
+    context.device->waitIdle();
 }
 
 namespace /* anonymous */ {
@@ -32,73 +34,82 @@ namespace /* anonymous */ {
 void
 draw_frame(vulkan::context& ctx) noexcept
 {
-    if (vk::Result::eSuccess !=
-        ctx.device->waitForFences(
-            *ctx.inflight_fences[ctx.current_frame], true, UINT64_MAX)) {
-        ERROR("failed to wait for fence");
-    }
+    ctx.device->waitForFences(
+        1u,
+        &*ctx.inflight_fences[ctx.current_frame],
+        VK_TRUE,
+        std::numeric_limits<uint64_t>::max());
 
     uint32_t image_index;
-    ctx.device->acquireNextImageKHR(
+    auto     result = ctx.device->acquireNextImageKHR(
         *ctx.swapchain,
-        UINT64_MAX,
+        std::numeric_limits<uint64_t>::max(),
         *ctx.image_avail_semaphores[ctx.current_frame],
-        nullptr,
+        vk::Fence(),
         &image_index);
 
-    // check if a previous frame is using this image (i.e. there is its
-    // fence to wait on)
-    if (ctx.images_inflight[image_index]) {
-        if (vk::Result::eSuccess !=
-            ctx.device->waitForFences(
-                ctx.images_inflight[image_index], true, UINT64_MAX)) {
-            ERROR("failed to wait for dence");
-        }
+    if (result == vk::Result::eErrorOutOfDateKHR) {
+        vulkan::recreate_swapchain(ctx);
+        return;
+    } else if (
+        result != vk::Result::eSuccess &&
+        result != vk::Result::eSuboptimalKHR) {
+        ERROR("failed to acquire next image");
     }
 
-    // mark the image as now being in use by this frame
+    if (ctx.images_inflight[image_index]) {
+        ctx.device->waitForFences(
+            1u,
+            &ctx.images_inflight[image_index],
+            VK_TRUE,
+            std::numeric_limits<uint32_t>::max());
+    }
     ctx.images_inflight[image_index] = *ctx.inflight_fences[ctx.current_frame];
+
+    vk::SubmitInfo submit_info;
 
     vk::Semaphore wait_semaphores[] = {
         *ctx.image_avail_semaphores[ctx.current_frame]};
     vk::PipelineStageFlags wait_stages[] = {
         vk::PipelineStageFlagBits::eColorAttachmentOutput};
-    vk::CommandBuffer cmd_buffers[] = {*ctx.command_buffers[image_index]};
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores    = wait_semaphores;
+    submit_info.pWaitDstStageMask  = wait_stages;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers    = &*ctx.command_buffers[image_index];
 
     vk::Semaphore signal_semaphores[] = {
         *ctx.render_finished_semaphores[ctx.current_frame]};
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores    = signal_semaphores;
 
-    vk::SubmitInfo submit_info(
-        1, wait_semaphores, wait_stages, 1, cmd_buffers, 1, signal_semaphores);
+    ctx.device->resetFences(1u, &*ctx.inflight_fences[ctx.current_frame]);
 
-    vk::Fence fences[] = {*ctx.inflight_fences[ctx.current_frame]};
-
-    if (vk::Result::eSuccess != ctx.device->resetFences(1, fences)) {
-        ERROR("failed to reset fences");
+    if (ctx.graphics_queue.submit(
+            1, &submit_info, *ctx.inflight_fences[ctx.current_frame]) !=
+        vk::Result::eSuccess) {
+        ERROR("failed to submit draw command buffer!");
     }
 
-    vk::SubmitInfo submits[] = {submit_info};
+    vk::PresentInfoKHR present_info;
 
-    if (vk::Result::eSuccess !=
-        ctx.graphics_queue.submit(
-            1, submits, *ctx.inflight_fences[ctx.current_frame])) {
-        ERROR("failed to submit draw command buffer");
-    }
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores    = signal_semaphores;
 
     vk::SwapchainKHR swapchains[] = {*ctx.swapchain};
+    present_info.swapchainCount   = 1;
+    present_info.pSwapchains      = swapchains;
+    present_info.pImageIndices    = &image_index;
 
-    vk::PresentInfoKHR present_info(
-        1, signal_semaphores, 1, swapchains, &image_index);
-
-    if (vk::Result::eSuccess != ctx.present_queue.presentKHR(present_info)) {
-        ERROR("failed to presentKHR");
+    result = ctx.present_queue.presentKHR(&present_info);
+    if (result == vk::Result::eErrorOutOfDateKHR ||
+        result == vk::Result::eSuboptimalKHR) {
+        vulkan::recreate_swapchain(ctx);
+    } else if (result != vk::Result::eSuccess) {
+        ERROR("failed to present swap chain image!");
     }
 
-    ctx.present_queue.waitIdle();
-    ++ctx.current_frame;
-    if (ctx.current_frame == vulkan::MAX_FRAMES_IN_FLIGHT) {
-        ctx.current_frame = 0;
-    }
+    ctx.current_frame = (ctx.current_frame + 1) % vulkan::MAX_FRAMES_IN_FLIGHT;
 }
 
 } // namespace

@@ -22,7 +22,7 @@ public:
         _height = height;
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         _wnd =
             glfwCreateWindow(_width, _height, caption.data(), nullptr, nullptr);
         return _wnd != nullptr;

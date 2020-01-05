@@ -7,6 +7,8 @@ struct context;
 
 void initialize_context(context&, int, int) noexcept;
 
+void resize_window(context&) noexcept;
+
 #ifndef NDEBUG
 void create_debug_utils_messenger_EXT(context&) noexcept;
 #endif // NDEBUG
@@ -19,7 +21,7 @@ void pick_physical_device(context&) noexcept;
 
 void create_logical_device(context&) noexcept;
 
-void create_swapchain(context&, int, int) noexcept;
+void create_swapchain(context&) noexcept;
 
 void create_image_views(context&) noexcept;
 

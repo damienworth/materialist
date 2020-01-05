@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string_view>

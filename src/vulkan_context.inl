@@ -260,13 +260,14 @@ choose_swap_present_mode(
 
 vk::Extent2D
 choose_swap_extent(
-    const vk::SurfaceCapabilitiesKHR& capabilities,
-    int                               width,
-    int                               height) noexcept
+    GLFWwindow* window, const vk::SurfaceCapabilitiesKHR& capabilities) noexcept
 {
     if (capabilities.currentExtent.width != UINT32_MAX) {
         return capabilities.currentExtent;
     }
+
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
 
     vk::Extent2D actual_extent = {static_cast<uint32_t>(width),
                                   static_cast<uint32_t>(height)};
@@ -282,6 +283,26 @@ choose_swap_extent(
         capabilities.maxImageExtent.height);
 
     return actual_extent;
+}
+
+void
+recreate_swapchain(context& ctx) noexcept
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(*ctx.window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(*ctx.window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    ctx.device->waitIdle();
+
+    create_swapchain(ctx);
+    create_image_views(ctx);
+    create_render_pass(ctx);
+    create_graphics_pipeline(ctx);
+    create_framebuffers(ctx);
+    create_command_buffers(ctx);
 }
 
 std::vector<char>
@@ -313,6 +334,18 @@ create_shader_module(vk::Device& device, const std::vector<char>& code) noexcept
     return std::move(shader_module);
 }
 
+void resize_window_callback(GLFWwindow* window, int width, int height);
+
+void
+resize_window_callback(GLFWwindow* window, int width, int height)
+{
+    if (width == 0 || height == 0) { return; }
+
+    auto pctx = reinterpret_cast<context*>(glfwGetWindowUserPointer(window));
+
+    recreate_swapchain(*pctx);
+}
+
 } // namespace
 
 void
@@ -321,6 +354,9 @@ initialize(context& ctx, int width, int height) noexcept
     if (!ctx.window.create("Materialist", width, height)) {
         ERROR("failed to create window");
     }
+
+    glfwSetWindowUserPointer(*ctx.window, &ctx);
+    (void)glfwSetFramebufferSizeCallback(*ctx.window, resize_window_callback);
 
     create_instance(ctx);
 
@@ -338,7 +374,7 @@ initialize(context& ctx, int width, int height) noexcept
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(*ctx.device);
 
-    create_swapchain(ctx, width, height);
+    create_swapchain(ctx);
 
     create_image_views(ctx);
 
@@ -563,17 +599,16 @@ create_logical_device(context& ctx) noexcept
 }
 
 void
-create_swapchain(context& ctx, int width, int height) noexcept
+create_swapchain(context& ctx) noexcept
 {
-    swapchain_support_details swapchain_support =
+    auto swapchain_support =
         query_swapchain_support(ctx.physical_device, *ctx.surface);
 
-    vk::SurfaceFormatKHR surface_format =
-        choose_swap_surface_format(swapchain_support.formats);
-    vk::PresentModeKHR present_mode =
+    auto surface_format = choose_swap_surface_format(swapchain_support.formats);
+    auto present_mode =
         choose_swap_present_mode(swapchain_support.present_modes);
-    vk::Extent2D extent =
-        choose_swap_extent(swapchain_support.capabilities, width, height);
+    auto extent =
+        choose_swap_extent(*ctx.window, swapchain_support.capabilities);
 
     uint32_t image_count = swapchain_support.capabilities.minImageCount + 1u;
     if (swapchain_support.capabilities.maxImageCount > 0 &&
