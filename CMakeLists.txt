@@ -9,6 +9,7 @@ if(CORES_NUM EQUAL 0)
     set(CORES_NUM 1)
 endif(CORES_NUM EQUAL 0)
 
+find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 
 find_program(GLSLC NAMES glslc)
@@ -29,6 +30,7 @@ add_executable(materialist
     src/error_handling.hpp
     src/fmtlib_all.hpp
     src/main.cpp
+    src/font.hpp
     src/materialist.hpp
     src/spdlog_all.hpp
     src/vulkan_context.hpp)
@@ -84,6 +86,7 @@ PRIVATE
     spdlog::spdlog_header_only
     glm_static
     glfw
+    Freetype::Freetype
     Vulkan::Vulkan)
 
 if (NOT CMAKE_CROSSCOMPILING)

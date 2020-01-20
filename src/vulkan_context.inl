@@ -1,3 +1,11 @@
+#define VK_CHECK(f, msg)                               \
+    {                                                  \
+        auto vk_check_result = f;                      \
+        if (vk_check_result != vk::Result::eSuccess) { \
+            ERROR("(VULKAN) {}", msg);                 \
+        }                                              \
+    }
+
 namespace vulkan {
 
 struct context {
@@ -111,9 +119,7 @@ check_device_extension_support(vk::PhysicalDevice physical_device) noexcept
 {
     auto [result, available_extensions] =
         physical_device.enumerateDeviceExtensionProperties();
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to enumerate device extension properties");
-    }
+    VK_CHECK(result, "failed to enumerate device extension properties");
 
     std::set<std::string> required_extensions(
         begin(g_device_extensions), end(g_device_extensions));
@@ -169,9 +175,7 @@ find_queue_families(vk::PhysicalDevice physical_device, vk::SurfaceKHR& surface)
     for (int idx = 0; idx != static_cast<int>(queue_families.size()); ++idx) {
         std::tie(result, present_support) =
             physical_device.getSurfaceSupportKHR(idx, surface);
-        if (result != vk::Result::eSuccess) {
-            ERROR("failed to get surface support KHR");
-        }
+        VK_CHECK(result, "failed to get surface support KHR");
         if (present_support) {
             indices.present_family = idx;
             break;
@@ -188,21 +192,15 @@ query_swapchain_support(
     swapchain_support_details details;
     auto [gscresult, capabilities] =
         physical_device.getSurfaceCapabilitiesKHR(surface);
-    if (gscresult != vk::Result::eSuccess) {
-        ERROR("failed to get surface capabilities");
-    }
+    VK_CHECK(gscresult, "failed to get surface capabilities");
     auto [gsfresult, formats] = physical_device.getSurfaceFormatsKHR(surface);
-    if (gsfresult != vk::Result::eSuccess) {
-        ERROR("failed to get surface formats");
-    }
+    VK_CHECK(gsfresult, "failed to get surface formats");
     details.capabilities = std::move(capabilities);
     details.formats      = std::move(formats);
 
     auto [gspmresult, present_modes] =
         physical_device.getSurfacePresentModesKHR(surface);
-    if (gspmresult != vk::Result::eSuccess) {
-        ERROR("failed to get surface present modes");
-    }
+    VK_CHECK(gspmresult, "failed to get surface present modes");
     details.present_modes = std::move(present_modes);
     return details;
 }
@@ -327,10 +325,7 @@ create_shader_module(vk::Device& device, const std::vector<char>& code) noexcept
         {}, code.size(), reinterpret_cast<const uint32_t*>(code.data()));
 
     auto [result, shader_module] = device.createShaderModuleUnique(smci);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to create shader module");
-    }
-
+    VK_CHECK(result, "failed to create shader module");
     return std::move(shader_module);
 }
 
@@ -400,10 +395,7 @@ create_debug_utils_messenger_EXT(context& ctx) noexcept
     auto  dmci     = populate_debug_messenger_create_info();
     auto [result, debug_messenger] =
         instance->createDebugUtilsMessengerEXTUnique(dmci);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to create debug-utils messenger");
-    }
-
+    VK_CHECK(result, "failed to create debug-utils messenger");
     ctx.debug_messenger = std::move(debug_messenger);
 }
 
@@ -411,10 +403,7 @@ bool
 check_validation_layer_support() noexcept
 {
     auto [result, available_layers] = vk::enumerateInstanceLayerProperties();
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to get instance layer properties count");
-    }
-
+    VK_CHECK(result, "failed to get instance layer properties count");
     spdlog::debug("available validation layers:");
     for (const auto& layer_properties : available_layers) {
         spdlog::debug("\t{}", layer_properties.layerName);
@@ -474,13 +463,10 @@ create_instance(context& ctx) noexcept
 #endif // NDEBUG
 
     auto [result, instance] = vk::createInstanceUnique(create_info);
-    if (result != vk::Result::eSuccess) { ERROR("failed to create instance!"); }
-
+    VK_CHECK(result, "failed to create instance!");
     auto [eiepresult, extension_props] =
         vk::enumerateInstanceExtensionProperties();
-    if (eiepresult != vk::Result::eSuccess) {
-        ERROR("failed to enumerate instance extension properties");
-    }
+    VK_CHECK(eiepresult, "failed to enumerate instance extension properties");
 
 #ifndef NDEBUG
     spdlog::debug("available extensions_properties:");
@@ -513,10 +499,7 @@ pick_physical_device(context& ctx) noexcept
 {
     vk::PhysicalDevice physical_device;
     auto [result, devices] = ctx.instance->enumeratePhysicalDevices();
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to find GPUs with Vulkan support");
-    }
-
+    VK_CHECK(result, "failed to find GPUs with Vulkan support");
     auto right_device = [&ctx](const auto& device) {
         return is_device_suitable(device, *ctx.surface);
     };
@@ -545,9 +528,7 @@ create_logical_device(context& ctx) noexcept
 
     auto [spmresult, present_modes] =
         ctx.physical_device.getSurfacePresentModesKHR(*ctx.surface);
-    if (spmresult != vk::Result::eSuccess) {
-        ERROR("failed to get surface present modes");
-    }
+    VK_CHECK(spmresult, "failed to get surface present modes");
 
     auto present_queue_family_index =
         gsl::narrow<uint32_t>(present_modes.size()) <
@@ -587,10 +568,7 @@ create_logical_device(context& ctx) noexcept
     create_info.setPEnabledFeatures(&device_features);
 
     auto [result, device] = ctx.physical_device.createDeviceUnique(create_info);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to create logical device!");
-    }
-
+    VK_CHECK(result, "failed to create logical device!");
     auto graphics_queue = device->getQueue(graphics_queue_family_index, 0);
     auto present_queue  = device->getQueue(present_queue_family_index, 0);
     ctx.device          = std::move(device);
@@ -651,14 +629,9 @@ create_swapchain(context& ctx) noexcept
 
     auto [csresult, swapchain] =
         ctx.device->createSwapchainKHRUnique(create_info);
-    if (csresult != vk::Result::eSuccess) {
-        ERROR("failed to create swapchain");
-    }
+    VK_CHECK(csresult, "failed to create swapchain");
     auto [gsiresult, images] = ctx.device->getSwapchainImagesKHR(*swapchain);
-    if (gsiresult != vk::Result::eSuccess) {
-        ERROR("failed to get swapchain images");
-    }
-
+    VK_CHECK(gsiresult, "failed to get swapchain images");
     ctx.swapchain = std::move(swapchain);
     ctx.images    = std::move(images);
     ctx.format    = surface_format.format;
@@ -687,9 +660,7 @@ create_image_views(context& ctx) noexcept
             subresource_range);
 
         auto [result, view] = ctx.device->createImageViewUnique(ivci);
-        if (result != vk::Result::eSuccess) {
-            ERROR("failed to create image view");
-        }
+        VK_CHECK(result, "failed to create image view");
         views.push_back(std::move(view));
     }
 
@@ -729,10 +700,7 @@ create_render_pass(context& ctx) noexcept
         {}, 1, &attachment_desc, 1, &subpass, 1, &dependency);
 
     auto [result, render_pass] = ctx.device->createRenderPassUnique(rpci);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to create render pass");
-    }
-
+    VK_CHECK(result, "failed to create render pass");
     ctx.render_pass = std::move(render_pass);
 }
 
@@ -823,10 +791,7 @@ create_graphics_pipeline(context& ctx) noexcept
 
     auto [cplresult, pipeline_layout] =
         device.createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo());
-    if (cplresult != vk::Result::eSuccess) {
-        ERROR("failed to create pipeline layout");
-    }
-
+    VK_CHECK(cplresult, "failed to create pipeline layout");
     ctx.pipeline_layout = std::move(pipeline_layout);
 
     auto shader_stages = std::array{vert_pssci, frag_pssci};
@@ -849,10 +814,7 @@ create_graphics_pipeline(context& ctx) noexcept
 
     auto [cgpresult, graphics_pipeline] =
         device.createGraphicsPipelinesUnique(nullptr, gpci);
-    if (cgpresult != vk::Result::eSuccess) {
-        ERROR("failed to create graphics pipeline");
-    }
-
+    VK_CHECK(cgpresult, "failed to create graphics pipeline");
     ctx.graphics_pipeline = std::move(graphics_pipeline.front());
 }
 
@@ -874,9 +836,7 @@ create_framebuffers(context& ctx) noexcept
             1);
 
         auto [result, framebuffer] = ctx.device->createFramebufferUnique(fci);
-        if (result != vk::Result::eSuccess) {
-            ERROR("failed to create framebuffer");
-        }
+        VK_CHECK(result, "failed to create framebuffer");
         framebuffers.push_back(std::move(framebuffer));
     }
 
@@ -891,10 +851,7 @@ create_command_pool(context& ctx) noexcept
     vk::CommandPoolCreateInfo cpci({}, *indices.graphics_family);
 
     auto [result, command_pool] = ctx.device->createCommandPoolUnique(cpci);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to create command pool");
-    }
-
+    VK_CHECK(result, "failed to create command pool");
     ctx.command_pool = std::move(command_pool);
 }
 
@@ -908,17 +865,12 @@ create_command_buffers(context& ctx) noexcept
 
     auto [result, command_buffers] =
         ctx.device->allocateCommandBuffersUnique(cbai);
-    if (result != vk::Result::eSuccess) {
-        ERROR("failed to allocate command buffers");
-    }
-
+    VK_CHECK(result, "failed to allocate command buffers");
     vk::ClearValue clear_color(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
 
     for (size_t i = 0; i != command_buffers.size(); ++i) {
         result = command_buffers[i]->begin(vk::CommandBufferBeginInfo());
-        if (result != vk::Result::eSuccess) {
-            ERROR("failed to begin recording command buffer");
-        }
+        VK_CHECK(result, "failed to begin recording command buffer");
 
         vk::RenderPassBeginInfo render_pass_info(
             *ctx.render_pass,
@@ -936,9 +888,7 @@ create_command_buffers(context& ctx) noexcept
         command_buffers[i]->draw(3, 1, 0, 0);
         command_buffers[i]->endRenderPass();
 
-        if (command_buffers[i]->end() != vk::Result::eSuccess) {
-            ERROR("failed to record command buffer");
-        }
+        VK_CHECK(command_buffers[i]->end(), "failed to record command buffer");
     }
 
     ctx.command_buffers = std::move(command_buffers);
@@ -963,23 +913,14 @@ create_sync_objects(context& ctx) noexcept
 
     for (size_t i = 0; i != MAX_FRAMES_IN_FLIGHT; ++i) {
         auto [iaresult, ia_semaphore] = device.createSemaphoreUnique(sci);
-        if (iaresult != vk::Result::eSuccess) {
-            ERROR("failed to create semaphore");
-        }
-
+        VK_CHECK(iaresult, "failed to create semaphore");
         auto [rfresult, rf_semaphore] = device.createSemaphoreUnique(sci);
-        if (rfresult != vk::Result::eSuccess) {
-            ERROR("failed to create semaphore");
-        }
-
+        VK_CHECK(rfresult, "failed to create semaphore");
         image_avail_semaphores.push_back(std::move(ia_semaphore));
         render_finished_semaphores.push_back(std::move(rf_semaphore));
 
         auto [ifresult, if_fence] = device.createFenceUnique(fci);
-        if (ifresult != vk::Result::eSuccess) {
-            ERROR("failed to create fence");
-        }
-
+        VK_CHECK(ifresult, "failed to create fence");
         inflight_fences.push_back(std::move(if_fence));
     }
 

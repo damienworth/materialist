@@ -15,18 +15,18 @@ main_loop() noexcept
         dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
-    vulkan::context context;
-    vulkan::initialize(context, 800, 600);
+    vulkan::context ctx;
+    vulkan::initialize(ctx, 800, 600);
 
-    auto& window = context.window;
+    auto& window = ctx.window;
     assert(*window);
 
     while (!glfwWindowShouldClose(*window)) {
         glfwPollEvents();
-        draw_frame(context);
+        draw_frame(ctx);
     }
 
-    context.device->waitIdle();
+    ctx.device->waitIdle();
 }
 
 namespace /* anonymous */ {

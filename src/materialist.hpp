@@ -19,15 +19,22 @@
 #include <vulkan/vulkan.hpp>
 
 #include "application.hpp"
-#include "glfwwindow.hpp"
+
 #include "vulkan_context.hpp"
+
+// #include "font.hpp"
+
+#include "glfwwindow.hpp"
 
 #include "error_handling.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 // implementation starts here
+
 #include "vulkan_context.inl"
+
+// #include "font.inl"
 
 #include "application.inl"
 
